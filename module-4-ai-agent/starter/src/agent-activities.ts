@@ -1,20 +1,26 @@
 // Activities used by the AI agent. Already written for you.
 //
-//  - callAgentLLM  : one call to the local Ollama model (the non-deterministic
-//                    bit — which is exactly why it must be an activity).
+//  - callAgentLLM  : one call to the model (the non-deterministic bit — which is
+//                    exactly why it must be an activity).
 //  - two mock tools the agent can ask to run: a credit report and a compliance
 //    check. They return deterministic fake data so the demo is predictable.
 
 import { generateText, tool, CoreMessage } from 'ai';
-import { createOllama } from 'ollama-ai-provider';
+import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import type { AgentLLMResponse, AgentMessage } from './models';
 
-const ollama = createOllama({
-  baseURL: process.env.OLLAMA_BASE_URL || 'http://localhost:11434/api',
+// The agent calls an OpenAI-compatible endpoint. In the workshop that's a shared
+// LiteLLM proxy on Fly that holds the real OpenAI key — so OPENAI_BASE_URL points
+// at the proxy and OPENAI_API_KEY is the proxy's shared key (both injected by the
+// sandbox runner; see litellm/README.md). To run it yourself, set OPENAI_API_KEY
+// to a real key and leave OPENAI_BASE_URL unset to hit api.openai.com directly.
+const openai = createOpenAI({
+  baseURL: process.env.OPENAI_BASE_URL, // unset -> api.openai.com
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-const AGENT_MODEL = process.env.AGENT_MODEL || 'qwen2.5:1.5b';
+const AGENT_MODEL = process.env.AGENT_MODEL || 'gpt-4o-mini';
 
 // Tool schemas handed to the LLM. Note there is no `execute` — we do NOT let the
 // AI SDK run the tools. The workflow dispatches each requested tool call as its
@@ -34,7 +40,7 @@ const AGENT_TOOL_SCHEMAS = {
 
 export async function callAgentLLM(params: { messages: AgentMessage[] }): Promise<AgentLLMResponse> {
   const result = await generateText({
-    model: ollama(AGENT_MODEL),
+    model: openai(AGENT_MODEL),
     messages: params.messages as CoreMessage[],
     tools: AGENT_TOOL_SCHEMAS,
     // maxSteps: 1 — stop the AI SDK from auto-looping; the WORKFLOW drives the loop.

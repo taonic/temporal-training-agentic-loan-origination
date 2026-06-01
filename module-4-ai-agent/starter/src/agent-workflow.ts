@@ -19,10 +19,15 @@ import type {
   AgentToolCall,
 } from './models';
 
-// The LLM call gets a generous timeout (the first call pays the model-load cost)
-// and Temporal's default retry policy, so a transient Ollama blip recovers itself.
+// The LLM call gets a generous timeout (the first call pays the model-load cost).
+// Retries recover a transient blip on their own, but we CAP attempts: against a
+// shared OpenAI proxy a 429 (rate limit / spent budget) is retryable, and the
+// default unlimited policy would have every workflow hammer the same bucket. With
+// a cap, a genuinely throttled run gives up and the agent ESCALATEs to a human
+// instead of looking stuck.
 const { callAgentLLM } = proxyActivities<typeof agentActivities>({
   startToCloseTimeout: '60 seconds',
+  retry: { maximumAttempts: 5 },
 });
 
 const { lookupFullCreditReport, checkComplianceWatchlist } = proxyActivities<typeof agentActivities>({

@@ -126,7 +126,7 @@ export async function homeLoanWorkflow(application: LoanApplication): Promise<Lo
     });
     log.info(`Agent recommended ${state.agentRecommendation.decision}`);
   } catch (err: any) {
-    // Agent unavailable (e.g. Ollama down) — record ESCALATE so the human
+    // Agent unavailable (e.g. the LLM is down) — record ESCALATE so the human
     // approver still sees something meaningful instead of a crash.
     log.warn(`Agent child failed: ${err.message || err}`);
     state.agentRecommendation = {

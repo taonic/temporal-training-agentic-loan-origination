@@ -1,0 +1,35 @@
+# LiteLLM proxy config for the workshop (no database).
+#
+# This proxy is the ONLY place the real OpenAI key lives. Student sandboxes get
+# the proxy's shared key instead, so the real key never ships to a place students
+# can read. A leaked shared key is bounded by the proxy's global rate limit and,
+# crucially, by a hard spend limit you set on the OpenAI project itself.
+#
+# The sandbox's agent asks for the model name "agent-model"
+# (module-4-ai-agent/.../agent-activities.ts -> AGENT_MODEL, injected by the
+# runner), which we map here to a real, cheap OpenAI model.
+
+model_list:
+  - model_name: agent-model
+    litellm_params:
+      model: openai/gpt-4o-mini          # cheap + good tool-calling; tune to taste
+      api_key: os.environ/OPENAI_API_KEY # the REAL key, injected as a Fly secret
+      # Deployment-level ceiling (enforced in-memory, no DB needed). Keep under
+      # your OpenAI tier's limits for this model.
+      rpm: 300
+      tpm: 600000
+
+litellm_settings:
+  # Whole-class concurrency cap. 30 students hitting the agent's 2-4 call
+  # tool-loop at once is bursty; this smooths it. Keep just under your tier.
+  max_parallel_requests: 40
+  # Retry/backoff toward OpenAI happens here, centrally, so 30 worker processes
+  # don't each independently hammer a 429.
+  num_retries: 2
+  request_timeout: 60
+
+general_settings:
+  # The single shared key every sandbox uses (also the admin key). Set as a Fly
+  # secret. With no database this is the only valid key; per-key budgets and
+  # rpm/tpm are a DB feature we deliberately don't use here.
+  master_key: os.environ/LITELLM_MASTER_KEY

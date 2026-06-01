@@ -120,7 +120,7 @@ export async function homeLoanWorkflow(application: LoanApplication): Promise<Lo
   //          workflowId: `${app.applicationId}-agent`,
   //          args: [{ application: { ...app }, creditScore: 750 }],
   //        });
-  //   3. Wrap it in try/catch so an Ollama outage records an ESCALATE
+  //   3. Wrap it in try/catch so an LLM outage records an ESCALATE
   //      recommendation instead of crashing the loan.
   //   4. state.completedActivities.push('agentReview'); setStatus('UNDERWRITTEN');
   //

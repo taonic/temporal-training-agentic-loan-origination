@@ -1,0 +1,969 @@
+:root {
+  color-scheme: light;
+  --temporal-uv: #444ce7;
+  --temporal-uv-strong: #3037c9;
+  --temporal-uv-soft: #eef0ff;
+  --space-black: #141414;
+  --space-900: #202024;
+  --space-700: #3f3f46;
+  --off-white: #f8fafc;
+  --paper: #ffffff;
+  --mist: #eef2f7;
+  --line: #d8dee8;
+  --line-strong: #b9c2d0;
+  --text: #141414;
+  --muted: #626b7a;
+  --faint: #8992a3;
+  --success: #0f8b68;
+  --success-soft: #dff7ef;
+  --amber: #c77700;
+  --amber-soft: #fff3d6;
+  --code-bg: #141414;
+  --code-panel: #0d0d10;
+  --code-ink: #f3f6fb;
+  --code-muted: #98a2b8;
+  --shadow: 0 18px 50px rgba(20, 20, 20, 0.12);
+  --surface: #ffffff;
+  --topbar-bg: rgba(248, 250, 252, 0.94);
+  --radius: 8px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --temporal-uv: #818cf8;
+  --temporal-uv-strong: #6366f1;
+  --temporal-uv-soft: #20243a;
+  --off-white: #0f1115;
+  --paper: #16181d;
+  --surface: #1b1e25;
+  --topbar-bg: rgba(18, 20, 25, 0.94);
+  --mist: #1c1f26;
+  --line: #2a2e37;
+  --line-strong: #3a3f4b;
+  --text: #e7ebf2;
+  --muted: #9aa3b2;
+  --faint: #6b7382;
+  --success: #34d399;
+  --success-soft: #10231c;
+  --amber: #fbbf24;
+  --amber-soft: #2a2310;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--off-white);
+  color: var(--text);
+}
+
+button,
+select,
+textarea {
+  font: inherit;
+}
+
+.app-frame {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--topbar-bg);
+  backdrop-filter: blur(14px);
+}
+
+.brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-image {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: #000000;
+  padding: 6px;
+  box-shadow: 0 8px 22px rgba(20, 20, 20, 0.16);
+}
+
+.brand-copy {
+  min-width: 0;
+}
+
+.eyebrow,
+.panel-kicker {
+  margin: 0 0 5px;
+  color: var(--temporal-uv);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+h2 {
+  font-size: 18px;
+  line-height: 1.22;
+}
+
+.topbar-controls,
+.runner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exercise-picker {
+  min-width: 340px;
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.exercise-picker select {
+  width: 100%;
+  height: 38px;
+  padding: 0 34px 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--text);
+}
+
+.button {
+  min-height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--text);
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 760;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.theme-toggle {
+  min-width: 38px;
+  font-size: 15px;
+  line-height: 1;
+  text-align: center;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--temporal-uv);
+  color: var(--temporal-uv);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.button-primary {
+  border-color: var(--temporal-uv);
+  background: var(--temporal-uv);
+  color: #ffffff;
+}
+
+.button-primary:hover:not(:disabled) {
+  border-color: var(--temporal-uv-strong);
+  background: var(--temporal-uv-strong);
+  color: #ffffff;
+}
+
+.button-secondary {
+  background: var(--paper);
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.button-cta {
+  border-color: var(--temporal-uv);
+  background: var(--temporal-uv-soft);
+  color: var(--temporal-uv);
+}
+
+.button-cta:hover:not(:disabled) {
+  border-color: var(--temporal-uv-strong);
+  background: var(--temporal-uv-soft);
+  color: var(--temporal-uv-strong);
+}
+
+.course-shell {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: clamp(360px, var(--code-col, 57%), calc(100% - 376px)) 10px minmax(320px, 1fr);
+  gap: 0;
+  padding: 16px;
+}
+
+.pane-resizer {
+  align-self: stretch;
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pane-resizer::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 46px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: var(--line-strong);
+  transition: background 120ms ease;
+}
+
+.pane-resizer:hover::before,
+.pane-resizer:active::before {
+  background: var(--temporal-uv);
+}
+
+.workspace-panel {
+  min-width: 0;
+  min-height: 0;
+  height: calc(100vh - 104px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.instruction-heading {
+  min-height: 42px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.instruction-heading-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.instruction-heading .panel-kicker {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.instruction-heading h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-progress-count {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Segmented progress bar: one segment per checkable step, filled as ticked. */
+.step-progress {
+  display: flex;
+  gap: 4px;
+}
+
+.step-progress-seg {
+  flex: 1 1 0;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  transition: background 160ms ease;
+}
+
+.step-progress-seg.filled {
+  background: var(--success);
+}
+
+.file-tabs,
+.runner-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  background: var(--off-white);
+}
+
+.file-tab,
+.runner-tab {
+  min-height: 42px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 9px 13px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.file-tab {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-weight: 700;
+}
+
+.file-tab:hover,
+.runner-tab:hover {
+  color: var(--text);
+}
+
+.file-tab.active,
+.runner-tab.active {
+  border-bottom-color: var(--temporal-uv);
+  background: var(--paper);
+  color: var(--text);
+}
+
+.runner-tab.active {
+  background: var(--code-bg);
+  color: #ffffff;
+}
+
+.file-tab.dirty::after {
+  content: " *";
+  color: var(--amber);
+}
+
+.tab-run {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 8px;
+  border-right: 1px solid var(--line);
+}
+
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--text);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tab-btn:hover:not(:disabled) {
+  border-color: var(--temporal-uv);
+  color: var(--temporal-uv);
+}
+
+.tab-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.view-tab {
+  margin-left: auto;
+  min-height: 42px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 9px 13px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.view-tab:hover {
+  color: var(--text);
+}
+
+.view-tab.active {
+  border-bottom-color: var(--temporal-uv);
+  color: var(--temporal-uv);
+}
+
+.editor-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  padding: 0 13px;
+  background: var(--code-bg);
+  color: var(--code-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.editor-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 0;
+}
+
+/* Layered editor: a highlighted <pre> sits behind a transparent <textarea>,
+   so typing stays fully editable while the code shows syntax colours. The two
+   layers MUST share identical typography/padding for the text to line up. */
+.editor-shell {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow: hidden;
+  background: var(--code-panel);
+}
+
+.editor-shell .code-highlight,
+.editor-shell .code-editor {
+  margin: 0;
+  border: 0;
+  padding: 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  tab-size: 2;
+  letter-spacing: normal;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.code-highlight {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--code-ink);
+  background: var(--code-panel);
+  pointer-events: none;
+}
+
+.code-highlight code {
+  font: inherit;
+}
+
+.code-editor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  outline: 0;
+  overflow: auto;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--code-ink);
+}
+
+.code-editor::selection {
+  background: rgba(129, 140, 248, 0.35);
+}
+
+/* Token palette (tuned for the dark editor surface, used in both themes). */
+.tok-comment { color: #6b7d8f; font-style: italic; }
+.tok-string { color: #c3e88d; }
+.tok-number { color: #f78c6c; }
+.tok-keyword { color: #c792ea; }
+.tok-function { color: #82aaff; }
+.tok-type { color: #ffcb6b; }
+.tok-decorator { color: #ffcb6b; }
+
+.dock-resizer {
+  flex: 0 0 auto;
+  position: relative;
+  height: 10px;
+  cursor: row-resize;
+  background: var(--code-bg);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  touch-action: none;
+}
+
+.dock-resizer::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46px;
+  height: 4px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  transition: background 120ms ease;
+}
+
+.dock-resizer:hover::before,
+.dock-resizer:active::before {
+  background: var(--temporal-uv);
+}
+
+.runner-dock {
+  flex: 0 0 auto;
+  height: 230px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  background: var(--code-bg);
+  color: var(--code-ink);
+}
+
+.runner-tabs {
+  background: #1f1f24;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.runner-tab {
+  color: #c6ccdc;
+  border-right-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Run controls now live in the tab row instead of a separate header. */
+.runner-tabs .runner-actions {
+  margin-left: auto;
+  align-self: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 0 10px;
+}
+
+.runner-tabs .runner-actions .button {
+  min-height: 28px;
+  padding: 4px 11px;
+  font-size: 12px;
+}
+
+/* Worker status indicator: grey dot when stopped, green (pulsing while
+   starting) when the worker is up. */
+.worker-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  margin-left: 12px;
+  padding: 0 12px;
+  color: var(--code-muted);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.worker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6b7280;
+}
+
+.worker-status.active {
+  color: #6ee7a8;
+}
+
+.worker-status.active .worker-dot {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.75);
+}
+
+.worker-status.busy .worker-dot {
+  animation: worker-pulse 1s ease-in-out infinite;
+}
+
+@keyframes worker-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+
+.runner-output {
+  flex: 1 1 auto;
+  margin: 0;
+  overflow: auto;
+  padding: 12px 14px;
+  color: var(--code-ink);
+  background: var(--code-bg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.instruction-content {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 18px 22px 28px;
+  line-height: 1.58;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin: 24px 0 9px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.markdown h1:first-child,
+.markdown h2:first-child,
+.markdown h3:first-child {
+  margin-top: 0;
+}
+
+.markdown h1 {
+  font-size: 26px;
+}
+
+.markdown h2 {
+  font-size: 20px;
+}
+
+.markdown h3 {
+  font-size: 16px;
+}
+
+.markdown h4 {
+  font-size: 14px;
+}
+
+.markdown p {
+  margin: 9px 0;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 8px 0 14px 20px;
+  padding: 0;
+}
+
+.markdown li {
+  margin: 6px 0;
+}
+
+.markdown a {
+  color: var(--temporal-uv);
+  font-weight: 740;
+  text-decoration: none;
+}
+
+.markdown a:hover {
+  text-decoration: underline;
+}
+
+.markdown code {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--off-white);
+  padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.92em;
+}
+
+.markdown pre {
+  margin: 12px 0 18px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--code-panel);
+  color: var(--code-ink);
+  padding: 14px;
+}
+
+.markdown pre code {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+
+/* Walkthrough steps render the markdown full-width with a "Mark step complete"
+   toggle at the end of each step. Only that control is interactive, so selecting
+   code inside a step never toggles it. */
+.walkthrough {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.step-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.step-body {
+  min-width: 0;
+}
+
+.step-block.completed .step-body {
+  opacity: 0.45;
+}
+
+/* Obvious, button-like completion toggle at the end of each step. */
+.step-check {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.step-check:hover {
+  border-color: var(--temporal-uv);
+  color: var(--temporal-uv);
+}
+
+.step-check input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--temporal-uv);
+  cursor: pointer;
+}
+
+.step-check.done {
+  border-color: var(--success);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.step-check.done input {
+  accent-color: var(--success);
+}
+
+/* The intro/recap sections render plainly, full-width. */
+.step-plain {
+  min-width: 0;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%) translateY(12px);
+  opacity: 0;
+  pointer-events: none;
+  border-radius: 999px;
+  background: var(--space-black);
+  color: #ffffff;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 10px 30px rgba(20, 20, 20, 0.22);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 1100px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .course-shell {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .pane-resizer {
+    display: none;
+  }
+
+  .workspace-panel {
+    height: min(860px, calc(100vh - 96px));
+  }
+}
+
+@media (max-width: 680px) {
+  .topbar {
+    padding: 14px;
+  }
+
+  .brand {
+    align-items: flex-start;
+  }
+
+  .brand-image {
+    width: 48px;
+    height: 48px;
+  }
+
+  h1 {
+    font-size: 22px;
+  }
+
+  .topbar-controls,
+  .exercise-picker {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .topbar-controls .button {
+    flex: 1;
+  }
+
+  .course-shell {
+    padding: 10px;
+  }
+
+  .instruction-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .runner-dock {
+    height: 300px;
+  }
+}
+
+/* Product tour */
+.tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.tour-backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.tour-spotlight {
+  position: fixed;
+  border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgba(15, 17, 21, 0.62);
+  outline: 2px solid var(--temporal-uv);
+  outline-offset: 2px;
+  pointer-events: none;
+  transition: top 0.18s ease, left 0.18s ease, width 0.18s ease, height 0.18s ease;
+}
+
+.tour-tooltip {
+  position: fixed;
+  width: min(320px, calc(100vw - 24px));
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px 14px;
+  z-index: 1001;
+}
+
+.tour-step-count {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--temporal-uv);
+}
+
+.tour-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.tour-body {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.tour-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tour-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.tour-skip {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: var(--faint);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.tour-skip:hover {
+  color: var(--muted);
+  text-decoration: underline;
+}

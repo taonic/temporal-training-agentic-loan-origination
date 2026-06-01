@@ -5,9 +5,10 @@ and tool call is a durable, replayable activity you can inspect in the UI.
 
 This module's `starter/` contains the Module 3 solution.
 
-> Make sure Ollama is up first (from the repo root): `npm run llm`. If the model
-> is unreachable the workflow records an `ESCALATE` recommendation instead of
-> crashing, so the pipeline still completes.
+> The agent calls OpenAI. Set `OPENAI_API_KEY` before starting the worker
+> (`export OPENAI_API_KEY=sk-...`). If the model is unreachable the workflow
+> records an `ESCALATE` recommendation instead of crashing, so the pipeline still
+> completes.
 
 ## Run it
 
@@ -49,7 +50,7 @@ state.agentRecommendation = await executeChild(underwritingAgentWorkflow, {
   args: [{ application: { ...app }, creditScore: 750 }],
 });
 ```
-(Wrap it in try/catch so an Ollama outage becomes an `ESCALATE` instead of a crash.)
+(Wrap it in try/catch so an LLM outage becomes an `ESCALATE` instead of a crash.)
 
 ## What to look for
 

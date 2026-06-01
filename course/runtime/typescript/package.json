@@ -1,0 +1,19 @@
+{
+  "name": "temporal-loan-course-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dependencies installed inside each Daytona sandbox so module worker/client code runs with ts-node.",
+  "dependencies": {
+    "@temporalio/activity": "^1.16.1",
+    "@temporalio/client": "^1.16.1",
+    "@temporalio/worker": "^1.16.1",
+    "@temporalio/workflow": "^1.16.1",
+    "@tsconfig/node18": "^18.2.4",
+    "@types/node": "^22.9.1",
+    "@ai-sdk/openai": "^1.3.24",
+    "ai": "^4.3.19",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3",
+    "zod": "^3.25.76"
+  }
+}

@@ -1,0 +1,39 @@
+# fly.toml — the LLM proxy that holds the real OpenAI key for the workshop.
+# Separate Fly app from the course portal so the key has the smallest possible
+# blast radius. No database — the proxy uses a single shared key and global rate
+# limits. Before the first deploy, from this directory:
+#
+#   fly launch --no-deploy --copy-config --name temporal-loan-llm-proxy
+#   fly secrets set OPENAI_API_KEY=sk-...real...
+#   fly secrets set LITELLM_MASTER_KEY=sk-...long-random-shared-key...
+#   fly deploy
+#
+# Then set a hard spend cap on the OpenAI project this key belongs to — that's
+# your budget backstop in place of per-student budgets.
+
+app = "temporal-loan-llm-proxy"
+primary_region = "syd"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  # Keep at least one machine warm during the workshop so the first request of the
+  # session isn't a cold start. Set min_machines_running = 0 when idle to save cost.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/health/liveliness"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024
