@@ -10,7 +10,6 @@ import {
 import { underwritingAgentWorkflow } from './agent-workflow';
 import type * as activities from './activities';
 import type {
-  CancelRequest,
   LoanApplication,
   LoanState,
   LoanStatus,
@@ -26,7 +25,7 @@ const { verifyIncome, runCreditCheck, underwrite } = proxyActivities<typeof acti
 
 export const getStateQuery = defineQuery<LoanState>('getState');
 export const approvalSignal = defineSignal<[]>('approveApplication');
-export const rejectSignal = defineSignal<[CancelRequest]>('rejectApplication');
+export const rejectSignal = defineSignal<[]>('rejectApplication');
 export const retrySignal = defineSignal<[RetryUpdate]>('retry');
 
 export async function homeLoanWorkflow(application: LoanApplication): Promise<LoanState> {
@@ -37,7 +36,6 @@ export async function homeLoanWorkflow(application: LoanApplication): Promise<Lo
     completedActivities: [],
     fixHistory: [],
     application: { ...application },
-    rejectReason: '',
     agentRecommendation: undefined,
   };
 
@@ -51,9 +49,8 @@ export async function homeLoanWorkflow(application: LoanApplication): Promise<Lo
   setHandler(approvalSignal, () => {
     approved = true;
   });
-  setHandler(rejectSignal, (req: CancelRequest) => {
+  setHandler(rejectSignal, () => {
     rejected = true;
-    state.rejectReason = req.reason || 'No reason provided';
   });
   setHandler(retrySignal, (update: RetryUpdate) => {
     if (update.key) {

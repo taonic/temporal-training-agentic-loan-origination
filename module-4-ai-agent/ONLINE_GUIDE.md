@@ -224,8 +224,8 @@ The agent's recommendation is advisory — a human still decides. Send the appro
 4. Click **Send a Signal** to submit.
 
 ✓ **Checkpoint:** the workflow advances to `APPROVED` and reaches **Completed** —
-confetti. (To see the decline path instead, send `rejectApplication` with input
-`{ "reason": "Policy exception" }`.)
+confetti. (To see the decline path instead, send `rejectApplication` — like
+`approveApplication`, it takes no input.)
 
 ---
 
