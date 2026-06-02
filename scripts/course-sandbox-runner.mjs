@@ -269,8 +269,10 @@ class CourseSandboxManager {
           "Module 4 needs the LLM proxy: set LLM_PROXY_URL and LLM_PROXY_KEY (see litellm/README.md).",
         );
       }
-      envVars.OPENAI_BASE_URL = `${llmProxyUrl}/v1`;
-      envVars.OPENAI_API_KEY = llmProxyKey;
+      // Provider-neutral names: the agent points at the proxy (an OpenAI-compatible
+      // endpoint), but this isn't an OpenAI key — it's the proxy's shared key.
+      envVars.LLM_BASE_URL = `${llmProxyUrl}/v1`;
+      envVars.LLM_API_KEY = llmProxyKey;
       envVars.AGENT_MODEL = agentModel;
     }
 
@@ -281,7 +283,9 @@ class CourseSandboxManager {
         envVars,
         autoStopInterval: 15,
         autoDeleteInterval: 30,
-        resources: { disk: 1, memory: 2 },
+        // cpu pinned to 2 (Daytona's default is 1) for snappier ts-node cold
+        // starts and the Temporal server + worker running side by side.
+        resources: { disk: 1, memory: 2, cpu: 2 },
       },
       { timeout: 120 },
     );

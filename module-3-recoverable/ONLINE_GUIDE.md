@@ -88,16 +88,20 @@ parked at the failed credit check. It did **not** fail outright.
 
 ## Step 5 — Fix it, then approve, from the Temporal UI
 
-1. **Send a Signal** named `retry` with this input:
+Click the **Temporal UI** button and open the running workflow **`LOAN-002`**. Both
+steps use the workflow page's actions menu, **top-right** (under *Workflow Actions*)
+→ **Send a Signal**:
+
+1. **Fix the data:** Signal name `retry`, input:
    ```json
    { "key": "ssn", "value": "222-33-4444" }
    ```
    The workflow patches the SSN, retries the credit check, and continues the
    pipeline — then parks at `PENDING_APPROVAL` (the gate you built in Module 2).
-2. **Send a Signal** named `approveApplication` to approve it.
+2. **Approve it:** Signal name `approveApplication`, input left empty.
 
 ✓ **Checkpoint:** the workflow reaches **Completed** — confetti. The fix is recorded
-in `fixHistory` (query `getState` to see it). A normal error would have been
+in `fixHistory` (run the `getState` query to see it). A normal error would have been
 auto-retried; `nonRetryable` is what lets you wait for human input instead.
 
 ---

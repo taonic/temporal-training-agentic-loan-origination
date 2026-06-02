@@ -86,14 +86,22 @@ button and click into `LOAN-001` — it's **Running**, sitting at the approval g
 
 ## Step 5 — Query and signal from the Temporal UI
 
-In the workflow's page in the Temporal UI:
+Click the **Temporal UI** button and open the running workflow **`LOAN-001`**. Both
+actions below live in the workflow page's actions menu, **top-right** (under
+*Workflow Actions*).
 
-- **Query** the live state: run the **`getState`** query — you read the current
-  `LoanState` without changing anything.
-- **Approve it:** use **Send a Signal** with the name `approveApplication`. The
-  workflow advances to `APPROVED` and **completes**.
-- **Or reject it:** send `rejectApplication` with input
-  `{ "reason": "Policy exception" }` → the workflow completes as `REJECTED`.
+**Query the live state (read-only):** choose **Query**, pick the **`getState`**
+query type, and submit — you read the current `LoanState` without changing anything.
+
+**Drive it forward with a signal:** choose **Send a Signal**. In the dialog set the
+**Signal name** and **input**:
+
+- **Approve:** name `approveApplication`, input left empty → the workflow advances
+  to `APPROVED` and **completes**.
+- **Reject:** name `rejectApplication`, input `{ "reason": "Policy exception" }` →
+  the workflow completes as `REJECTED`.
+
+Click **Send a Signal** to submit.
 
 ✓ **Checkpoint:** the workflow reaches **Completed** — and confetti fires. (The
 runner watches your workflow finish and celebrates when it does.)

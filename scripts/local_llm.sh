@@ -73,14 +73,14 @@ if [ "$USE_PROXY" -eq 1 ]; then
   done
   echo
   cat > "$ENV_FILE" <<EOF
-export OPENAI_BASE_URL=http://localhost:4000/v1
-export OPENAI_API_KEY=sk-local
+export LLM_BASE_URL=http://localhost:4000/v1
+export LLM_API_KEY=sk-local
 export AGENT_MODEL=agent-model
 EOF
 else
   cat > "$ENV_FILE" <<EOF
-export OPENAI_BASE_URL=http://localhost:11434/v1
-export OPENAI_API_KEY=ollama
+export LLM_BASE_URL=http://localhost:11434/v1
+export LLM_API_KEY=ollama
 export AGENT_MODEL=$MODEL
 EOF
 fi

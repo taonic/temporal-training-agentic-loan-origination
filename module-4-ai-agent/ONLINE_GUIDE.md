@@ -72,11 +72,19 @@ reasoning, made durable. The parent then parks at `PENDING_APPROVAL`.
 
 ## Step 4 — Approve to finish
 
-In `LOAN-001`, **Send a Signal** named `approveApplication` (the agent's
-recommendation is advisory — a human still decides).
+The agent's recommendation is advisory — a human still decides. Send the approval
+**signal** from the Temporal UI:
 
-✓ **Checkpoint:** the workflow reaches **Completed** — confetti. (Try
-`rejectApplication` with a reason to see the decline path instead.)
+1. Click the **Temporal UI** button and open the running workflow **`LOAN-001`**.
+2. On the workflow page, open the actions menu in the **top-right** and choose
+   **Send a Signal** (listed under *Workflow Actions*).
+3. In the dialog, set **Signal name** to `approveApplication` and leave the
+   **input** empty (this signal takes no arguments).
+4. Click **Send a Signal** to submit.
+
+✓ **Checkpoint:** the workflow advances to `APPROVED` and reaches **Completed** —
+confetti. (To see the decline path instead, send `rejectApplication` with input
+`{ "reason": "Policy exception" }`.)
 
 ---
 

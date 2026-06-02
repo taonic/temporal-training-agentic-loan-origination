@@ -10,14 +10,16 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import type { AgentLLMResponse, AgentMessage } from './models';
 
-// The agent calls an OpenAI-compatible endpoint. In the workshop that's a shared
-// LiteLLM proxy on Fly that holds the real OpenAI key — so OPENAI_BASE_URL points
-// at the proxy and OPENAI_API_KEY is the proxy's shared key (both injected by the
-// sandbox runner; see litellm/README.md). To run it yourself, set OPENAI_API_KEY
-// to a real key and leave OPENAI_BASE_URL unset to hit api.openai.com directly.
+// The agent talks to any OpenAI-compatible endpoint, chosen by env. The names are
+// provider-neutral on purpose — the endpoint often ISN'T OpenAI:
+//   - workshop: the shared LiteLLM proxy (LLM_BASE_URL = proxy, LLM_API_KEY = its
+//     shared key) — both injected by the sandbox runner; see litellm/README.md.
+//   - offline:  a local qwen via Ollama (LLM_BASE_URL = http://localhost:11434/v1).
+//   - direct:   real OpenAI — leave LLM_BASE_URL unset and set OPENAI_API_KEY.
+// LLM_API_KEY falls back to OPENAI_API_KEY so a local dev's standard key just works.
 const openai = createOpenAI({
-  baseURL: process.env.OPENAI_BASE_URL, // unset -> api.openai.com
-  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.LLM_BASE_URL, // unset -> api.openai.com
+  apiKey: process.env.LLM_API_KEY || process.env.OPENAI_API_KEY,
 });
 
 const AGENT_MODEL = process.env.AGENT_MODEL || 'gpt-4o-mini';

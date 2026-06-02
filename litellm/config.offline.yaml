@@ -19,5 +19,5 @@ litellm_settings:
   request_timeout: 120
 
 general_settings:
-  # Local-only shared key. Use it as OPENAI_API_KEY when pointing at this proxy.
+  # Local-only shared key. Use it as LLM_API_KEY when pointing at this proxy.
   master_key: sk-local

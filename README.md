@@ -145,7 +145,7 @@ changes); it isn't wired into CI.
 3. **For Module 4's agent, pick one** (Modules 1–3 need neither):
    - **Online** — an OpenAI API key, exported before running the Module 4 worker:
      ```bash
-     export OPENAI_API_KEY=sk-...      # leave OPENAI_BASE_URL unset to hit OpenAI directly
+     export OPENAI_API_KEY=sk-...      # leave LLM_BASE_URL unset to hit OpenAI directly
      ```
    - **Offline** — **Docker**, to run a local qwen model with no key and no
      internet. See [Run it offline](#run-it-offline-on-your-machine).
@@ -197,17 +197,17 @@ with Docker. One command starts Ollama, pulls the model, and writes the env vars
 
 ```bash
 npm run local-llm        # wraps docker compose; writes .env.offline when ready
-source .env.offline      # load OPENAI_BASE_URL / OPENAI_API_KEY / AGENT_MODEL
+source .env.offline      # load LLM_BASE_URL / LLM_API_KEY / AGENT_MODEL
 # ...then start the Module 4 worker as usual. Stop later with: npm run local-llm:down
 ```
 
-That's equivalent to doing it by hand (the agent code is unchanged — only these
-env vars differ):
+That's equivalent to doing it by hand (the agent code is unchanged — it just points
+at any OpenAI-compatible endpoint; only these env vars differ):
 
 ```bash
 docker compose up        # starts Ollama and pulls qwen2.5:1.5b (~1GB, first time only)
-export OPENAI_BASE_URL=http://localhost:11434/v1
-export OPENAI_API_KEY=ollama          # any non-empty value; Ollama ignores it
+export LLM_BASE_URL=http://localhost:11434/v1
+export LLM_API_KEY=ollama          # any non-empty value; Ollama ignores it
 export AGENT_MODEL=qwen2.5:1.5b
 ```
 

@@ -22,7 +22,7 @@ env vars:
 
 ```bash
 npm run local-llm        # or: ./scripts/local_llm.sh
-source .env.offline      # OPENAI_BASE_URL / OPENAI_API_KEY / AGENT_MODEL
+source .env.offline      # LLM_BASE_URL / LLM_API_KEY / AGENT_MODEL
 ```
 
 (Stop it later with `npm run local-llm:down`.)
@@ -32,8 +32,8 @@ source .env.offline      # OPENAI_BASE_URL / OPENAI_API_KEY / AGENT_MODEL
 
 ```bash
 docker compose up        # pulls qwen2.5:1.5b (~1GB, first time only)
-export OPENAI_BASE_URL=http://localhost:11434/v1
-export OPENAI_API_KEY=ollama          # any non-empty value; Ollama ignores it
+export LLM_BASE_URL=http://localhost:11434/v1
+export LLM_API_KEY=ollama          # any non-empty value; Ollama ignores it
 export AGENT_MODEL=qwen2.5:1.5b
 ```
 

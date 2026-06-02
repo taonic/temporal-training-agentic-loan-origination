@@ -6,16 +6,17 @@ the real OpenAI key where they can read it. **No database required.**
 ## Why a proxy at all
 
 Students edit and run code inside their Daytona sandbox, so **any key in the
-sandbox is readable by the student** — `console.log(process.env.OPENAI_API_KEY)`
+sandbox is readable by the student** — `console.log(process.env.LLM_API_KEY)`
 is enough. There is no "secure" way to bake a real key into a place where the
 student runs arbitrary code.
 
 So the real OpenAI key lives only here, in the proxy. Sandboxes get the proxy's
-**shared key** instead:
+**shared key** instead (as `LLM_API_KEY` — a provider-neutral name, since the
+endpoint the agent talks to is the proxy, not OpenAI):
 
 ```
 sandbox (student-editable)   ──shared key──▶   LiteLLM proxy   ──real OpenAI key──▶   OpenAI
-   OPENAI_BASE_URL ─────────────────────────▶  (Fly secret)
+   LLM_BASE_URL ───────────────────────────▶  (Fly secret)
 ```
 
 The shared key only reaches OpenAI *through* the proxy, which applies a global
@@ -67,7 +68,7 @@ fly secrets set LLM_PROXY_URL=https://temporal-loan-llm-proxy.fly.dev \
                 -a temporal-agentic-loan-origination
 ```
 
-The runner then injects `OPENAI_BASE_URL`, `OPENAI_API_KEY` (the shared key), and
+The runner then injects `LLM_BASE_URL`, `LLM_API_KEY` (the shared key), and
 `AGENT_MODEL=agent-model` into each Module 4 sandbox. The agent picks them up
 automatically — see
 [agent-activities.ts](../module-4-ai-agent/solution/src/agent-activities.ts).
