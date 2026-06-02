@@ -153,6 +153,9 @@ async function resolveModule(moduleId) {
     worker: `npx ts-node ${moduleId}/starter/src/worker.ts`,
     starter: starterCmd,
     workerProcessPattern: `${moduleId}/starter/src/worker.ts`,
+    // The workflow id the client uses (bad-ssn scenario uses LOAN-002). The
+    // browser polls /api/await-result with this to celebrate completion.
+    workflowId: scenario === "bad-ssn" ? "LOAN-002" : "LOAN-001",
     // Module 4's agent needs a local LLM; detected by its agent activities file.
     needsLlm: files.includes("agent-activities.ts"),
   };
@@ -204,7 +207,11 @@ class CourseSandboxManager {
       if (mustStartWorker) await this.startWorker(sandbox, module, events);
       const out = {};
       if (wantStarter) out.workflowResult = await this.runStarter(sandbox, module, events);
-      return { ...uiInfo, sandboxId: sandbox.id, ...out };
+      // We hand back the workflow id; the browser then polls /api/await-result and
+      // celebrates when the workflow actually completes — which for modules that
+      // pause for a human signal happens after the learner sends it, and after a
+      // worker restart in the durability demo. One uniform "you did it" moment.
+      return { ...uiInfo, sandboxId: sandbox.id, workflowId: module.workflowId, ...out };
     } catch (err) {
       if (created) {
         events.log(`Launch failed: ${err.message}. Cleaning up sandbox...`);
@@ -382,6 +389,17 @@ class CourseSandboxManager {
     events.log("Submitting loan application...");
     events.log(`$ ${module.starter}`);
 
+    // Give the client the sandbox's Temporal UI URL so its "Watch it at ..."
+    // link points at this sandbox (not localhost). Falls back to localhost in the
+    // client when unset. Single-quoted so the signed URL's query is shell-safe.
+    let uiEnv = "";
+    try {
+      const ui = await sandbox.getSignedPreviewUrl(temporalUiPort, 3600);
+      uiEnv = `TEMPORAL_UI_URL='${ui.url}' `;
+    } catch (err) {
+      events.log(`Could not resolve Temporal UI URL: ${err.message}`);
+    }
+
     // A fresh session each run; drop any leftover one so a re-run cleanly
     // supersedes (and kills) a previous client command.
     try {
@@ -391,7 +409,7 @@ class CourseSandboxManager {
     }
     await sandbox.process.createSession("starter");
     const { cmdId } = await sandbox.process.executeSessionCommand("starter", {
-      command: `cd ${appDir} && ${module.starter}`,
+      command: `cd ${appDir} && ${uiEnv}${module.starter}`,
       runAsync: true,
     });
 
@@ -422,6 +440,36 @@ class CourseSandboxManager {
     events.log("Client output:");
     for (const line of output.split("\n")) events.log(`  ${line}`);
     return output;
+  }
+
+  // Long-poll helper behind /api/await-result. Blocks (up to ~55s) on the Temporal
+  // CLI's `workflow result`, which returns once the workflow closes. The browser
+  // calls this repeatedly after a run; when it finally reports completed (which
+  // for signal-driven modules is after the learner sends the signal, and after a
+  // worker restart in the durability demo) the UI fires confetti. Returns
+  // { completed, result } or { gone: true } if the sandbox is no longer there.
+  async awaitWorkflowResult(sandboxId, workflowId) {
+    let sandbox;
+    try {
+      sandbox = await this.daytona.get(sandboxId);
+    } catch {
+      return { gone: true };
+    }
+    try {
+      const res = await sandbox.process.executeCommand(
+        `${temporalBin} workflow result --workflow-id ${workflowId} --address localhost:7233 2>&1`,
+        undefined,
+        undefined,
+        55,
+      );
+      if (res?.exitCode === 0) {
+        return { completed: true, result: (res.result || res.output || "").trim() };
+      }
+    } catch {
+      /* timeout while the workflow is still open, or a transient blip - the
+         browser will poll again. */
+    }
+    return { completed: false };
   }
 
   async waitForTemporal(sandbox, sessionId, cmdId, events) {
@@ -483,6 +531,17 @@ const server = http.createServer(async (req, res) => {
       writeSse(res, "result", result);
       writeSse(res, "done", null);
       res.end();
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/await-result") {
+      const body = await readJson(req);
+      if (!body.sandboxId || !body.workflowId) {
+        json(res, 400, { error: "sandboxId and workflowId required" });
+        return;
+      }
+      const result = await getManager().awaitWorkflowResult(body.sandboxId, body.workflowId);
+      json(res, 200, result);
       return;
     }
 

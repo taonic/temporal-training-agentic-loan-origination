@@ -25,7 +25,12 @@ async function run() {
   await worker.run();
 }
 
-run().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Only start the worker when this file is run directly (e.g. `ts-node worker.ts`).
+// The client imports TASK_QUEUE from here; without this guard that import would
+// boot a second worker inside the client process, and the client would hang.
+if (require.main === module) {
+  run().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

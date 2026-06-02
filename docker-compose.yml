@@ -1,0 +1,66 @@
+# Local offline stack for Module 4's AI agent — runs a small qwen model via
+# Ollama so the agent needs no OpenAI key and no internet. (Modules 1-3 have no
+# LLM and need none of this.)
+#
+#   docker compose up                 # Ollama + auto-pull the qwen model
+#
+# Then point the agent at Ollama's OpenAI-compatible endpoint and run the module
+# (see module-4-ai-agent/OFFLINE_GUIDE.md):
+#   export OPENAI_BASE_URL=http://localhost:11434/v1
+#   export OPENAI_API_KEY=ollama          # any non-empty value; Ollama ignores it
+#   export AGENT_MODEL=qwen2.5:1.5b
+#
+# Optional: front Ollama with the same LiteLLM proxy used in production, so local
+# mirrors prod (model name "agent-model", a real /v1 proxy). Not required:
+#   docker compose --profile proxy up
+#   export OPENAI_BASE_URL=http://localhost:4000/v1
+#   export OPENAI_API_KEY=sk-local
+#   export AGENT_MODEL=agent-model
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: loan-demo-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-shot sidecar that pulls the model once Ollama is up, then exits.
+  # qwen2.5:1.5b (~1GB) is the smallest Qwen with reasonably reliable tool calling.
+  # Bump to qwen2.5:3b or qwen2.5:7b for more reliable multi-turn tool JSON
+  # at the cost of CPU inference time (also bump AGENT_MODEL to match).
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=ollama:11434
+      - OLLAMA_MODEL=qwen2.5:1.5b
+    entrypoint: ["sh", "-c", "ollama pull $$OLLAMA_MODEL"]
+    restart: "no"
+
+  # Optional (profile "proxy"): a LiteLLM proxy in front of Ollama, so local dev
+  # speaks the same "agent-model" / OpenAI-compatible /v1 shape as production.
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: loan-demo-litellm
+    profiles: ["proxy"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm/config.offline.yaml:/app/config.offline.yaml:ro
+    command: ["--config", "/app/config.offline.yaml", "--port", "4000", "--host", "0.0.0.0"]
+
+volumes:
+  ollama_data:

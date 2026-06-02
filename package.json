@@ -4,6 +4,8 @@
   "private": true,
   "description": "A 3-hour, hands-on workshop: build a durable loan-origination workflow with an agentic AI underwriter on Temporal.",
   "scripts": {
+    "local-llm": "bash scripts/local_llm.sh",
+    "local-llm:down": "bash scripts/local_llm.sh down",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "node scripts/course-sandbox-runner.mjs",
     "course:data": "node scripts/build-course-site.mjs",

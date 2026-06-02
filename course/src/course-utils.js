@@ -109,7 +109,12 @@ export function renderMarkdown(markdown) {
     }
   };
 
-  for (const line of lines) {
+  // Split a GFM table row into trimmed cells, ignoring the optional outer pipes.
+  const splitRow = (row) =>
+    row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const fence = line.match(/^```(\S*)/);
     if (fence) {
       if (inCode) {
@@ -143,6 +148,14 @@ export function renderMarkdown(markdown) {
       continue;
     }
 
+    // Thematic break: a line of 3+ of -, *, or _ and nothing else.
+    if (/^\s*([-*_])\1{2,}\s*$/.test(line)) {
+      flushPara();
+      closeList();
+      html.push("<hr>");
+      continue;
+    }
+
     const ordered = line.match(/^\s*\d+\.\s+(.+)$/);
     if (ordered) {
       flushPara();
@@ -164,6 +177,37 @@ export function renderMarkdown(markdown) {
         html.push("<ul>");
       }
       html.push(`<li>${inlineMarkdown(unordered[1])}</li>`);
+      continue;
+    }
+
+    // GFM table: a header row (contains a pipe) immediately followed by a
+    // |---|---| separator row, then body rows until a blank/non-pipe line.
+    const sep = lines[i + 1];
+    const isTable =
+      line.includes("|") &&
+      sep &&
+      sep.includes("|") &&
+      sep.includes("-") &&
+      /^[\s|:-]+$/.test(sep);
+    if (isTable) {
+      flushPara();
+      closeList();
+      const headers = splitRow(line);
+      i++; // consume the separator row
+      const bodyRows = [];
+      while (i + 1 < lines.length && lines[i + 1].includes("|") && lines[i + 1].trim()) {
+        bodyRows.push(splitRow(lines[i + 1]));
+        i++;
+      }
+      const thead = `<thead><tr>${headers
+        .map((h) => `<th>${inlineMarkdown(h)}</th>`)
+        .join("")}</tr></thead>`;
+      const tbody = `<tbody>${bodyRows
+        .map(
+          (r) => `<tr>${r.map((c) => `<td>${inlineMarkdown(c)}</td>`).join("")}</tr>`,
+        )
+        .join("")}</tbody>`;
+      html.push(`<table>${thead}${tbody}</table>`);
       continue;
     }
 

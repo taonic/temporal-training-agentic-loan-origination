@@ -1,0 +1,23 @@
+# LiteLLM config for the OPTIONAL local offline proxy (docker compose profile
+# "proxy"). Fronts the local Ollama container so dev mirrors the production proxy
+# shape: the agent asks for "agent-model" over an OpenAI-compatible /v1 endpoint,
+# and here it's served by a local qwen model instead of OpenAI.
+#
+# Production uses litellm/config.yaml (real OpenAI key). This file has no secrets
+# and talks only to the local Ollama container — safe to commit.
+
+model_list:
+  - model_name: agent-model
+    litellm_params:
+      # ollama_chat/* uses Ollama's /api/chat, which handles tool calls better
+      # than the plain completion endpoint. Keep in sync with the model that
+      # docker-compose's ollama-pull fetched.
+      model: ollama_chat/qwen2.5:1.5b
+      api_base: http://ollama:11434
+
+litellm_settings:
+  request_timeout: 120
+
+general_settings:
+  # Local-only shared key. Use it as OPENAI_API_KEY when pointing at this proxy.
+  master_key: sk-local

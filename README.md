@@ -33,6 +33,7 @@ in the companion `temporal-loan-origination-demo` repo.
 ```
 temporal-training-agentic-loan-origination/
 ├── package.json, tsconfig.json
+├── docker-compose.yml           <- local qwen model for offline Module 4
 ├── litellm/                     <- the shared OpenAI proxy (Module 4)
 ├── module-1-durable-pipeline/
 │   ├── README.md
@@ -54,7 +55,10 @@ temporal-training-agentic-loan-origination/
   through a shared proxy — no per-student keys to manage. See
   [Run it in the browser](#run-it-in-the-browser) below.
 - **Locally in four terminals** — the classic setup. See
-  [How to run any module](#how-to-run-any-module).
+  [How to run any module](#how-to-run-any-module). Module 4 calls OpenAI by
+  default, or you can run it **fully offline** against a local qwen model — see
+  [Run it offline](#run-it-offline-on-your-machine). Each module also has its own
+  `OFFLINE_GUIDE.md`.
 
 ---
 
@@ -107,14 +111,16 @@ Two small [Fly.io](https://fly.io) apps:
 `Dockerfile`, `fly.toml`, and GitHub Actions workflow deploy it:
 
 ```bash
-fly secrets set DAYTONA_KEY=your_daytona_key
+fly secrets set DAYTONA_KEY="$DAYTONA_KEY"
 # So the runner can point Module 4 sandboxes at the LLM proxy (deployed below):
 fly secrets set LLM_PROXY_URL=https://temporal-loan-llm-proxy.fly.dev \
-                LLM_PROXY_KEY=sk-...shared-key...
+                LLM_PROXY_KEY="$LLM_PROXY_KEY"
 fly deploy
 ```
 
-Pushes to `main` redeploy automatically once the `FLY_API_TOKEN` repo secret is set.
+Pushes to `main` redeploy this automatically once the `FLY_API_TOKEN` repo secret
+is set. Because the proxy (below) shares that secret, use an **org-scoped** token
+that can deploy both apps: `fly tokens create org <org-slug>`.
 
 **2. The LLM proxy.** Holds the **real OpenAI key** so it never reaches a sandbox,
 and exposes a single shared key (the same value as `LLM_PROXY_KEY` above) behind a
@@ -128,19 +134,24 @@ fly deploy
 # then set a hard spend cap on that OpenAI project — your budget backstop
 ```
 
+After this first manual deploy, pushes to `main` that touch `litellm/` redeploy the
+proxy automatically via [`.github/workflows/fly-deploy-litellm.yml`](.github/workflows/fly-deploy-litellm.yml).
+
 ---
 
 ## Prerequisites (do this BEFORE the workshop)
 
 1. **Node.js 18+** — `node --version`
 2. **Temporal CLI** — https://docs.temporal.io/cli#install — `temporal --version`
-3. **An OpenAI API key** (for Module 4's agent) — export it before running the
-   Module 4 worker:
-   ```bash
-   export OPENAI_API_KEY=sk-...        # leave OPENAI_BASE_URL unset to hit OpenAI directly
-   ```
-   Modules 1–3 need no key. (The browser path uses the shared proxy instead, so
-   students don't need their own key.)
+3. **For Module 4's agent, pick one** (Modules 1–3 need neither):
+   - **Online** — an OpenAI API key, exported before running the Module 4 worker:
+     ```bash
+     export OPENAI_API_KEY=sk-...      # leave OPENAI_BASE_URL unset to hit OpenAI directly
+     ```
+   - **Offline** — **Docker**, to run a local qwen model with no key and no
+     internet. See [Run it offline](#run-it-offline-on-your-machine).
+
+   (The browser path uses the shared proxy instead, so students need neither.)
 4. **Install deps** (from the repo root): `npm install`
 5. **Smoke-test the dev server:**
    ```bash
@@ -176,6 +187,43 @@ npx ts-node <module-folder>/starter/src/client.ts
 Open **http://localhost:8233** and click into your workflow to watch each step
 appear in the event history. This native Temporal UI is the main thing you'll be
 looking at all workshop.
+
+---
+
+## Run it offline (on your machine)
+
+Everything above runs locally already. The only piece that reaches the internet
+is **Module 4's agent**, which calls OpenAI by default. To run Module 4 with **no API key and no internet**, serve a small local model
+with Docker. One command starts Ollama, pulls the model, and writes the env vars:
+
+```bash
+npm run local-llm        # wraps docker compose; writes .env.offline when ready
+source .env.offline      # load OPENAI_BASE_URL / OPENAI_API_KEY / AGENT_MODEL
+# ...then start the Module 4 worker as usual. Stop later with: npm run local-llm:down
+```
+
+That's equivalent to doing it by hand (the agent code is unchanged — only these
+env vars differ):
+
+```bash
+docker compose up        # starts Ollama and pulls qwen2.5:1.5b (~1GB, first time only)
+export OPENAI_BASE_URL=http://localhost:11434/v1
+export OPENAI_API_KEY=ollama          # any non-empty value; Ollama ignores it
+export AGENT_MODEL=qwen2.5:1.5b
+```
+
+Modules 1–3 have no LLM, so they're already fully offline — no Docker needed.
+Per-module steps are in each module's **`OFFLINE_GUIDE.md`** (start with
+[module-4-ai-agent/OFFLINE_GUIDE.md](./module-4-ai-agent/OFFLINE_GUIDE.md)).
+
+> The small qwen model is CPU-bound and less reliable at tool-calling than a
+> hosted model; the agent's `ESCALATE` fallback covers the cases it can't parse.
+> Bump to `qwen2.5:3b`/`7b` in [docker-compose.yml](./docker-compose.yml) (and
+> `AGENT_MODEL`) for steadier results.
+>
+> **Optional:** `npm run local-llm -- --proxy` (or `docker compose --profile proxy
+> up`) also starts a local LiteLLM proxy in front of Ollama, mirroring the
+> production proxy shape (`agent-model` on `http://localhost:4000/v1`). Not required.
 
 ---
 

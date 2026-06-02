@@ -20,15 +20,47 @@ function initialTheme() {
 
 const course = window.COURSE_DATA;
 
-// Each module's client.ts starts a loan application and prints a confirmation
-// ending in a "Watch it at <url>" line — it does not block on the workflow
-// (modules 2+ pause for human signals you send from the Temporal UI). So a run
-// is "correct" once that confirmation line appears in the output.
-function outputMatchesExpected(_moduleId, output) {
-  // Strip ANSI colour codes so a styled line still matches cleanly.
-  const trimmed = String(output ?? "").replace(/\x1b\[[0-9;]*m/g, "").trim();
-  if (!trimmed) return false;
-  return /^Started\b/m.test(trimmed) || /Watch it at/.test(trimmed);
+// Confetti fires when the workflow actually COMPLETES — which for modules that
+// pause for a human signal is after the learner sends it (and after the worker
+// restart in the durability demo). We long-poll the runner (which blocks on
+// `temporal workflow result`) until the workflow closes, then celebrate once.
+// A new run aborts any in-flight watch so we never celebrate a stale execution.
+let completionPoll = null;
+function startCompletionPoll(sandboxId, workflowId) {
+  completionPoll?.abort();
+  const controller = new AbortController();
+  completionPoll = controller;
+  (async () => {
+    const deadline = Date.now() + 10 * 60 * 1000; // stop watching after 10 minutes
+    while (!controller.signal.aborted && Date.now() < deadline) {
+      let data;
+      try {
+        const res = await fetch("/api/await-result", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sandboxId, workflowId }),
+          signal: controller.signal,
+        });
+        data = await res.json();
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        await new Promise((r) => setTimeout(r, 3000)); // transient — back off, retry
+        continue;
+      }
+      if (controller.signal.aborted || data.gone) return;
+      if (data.completed) {
+        if (completionPoll === controller) {
+          try {
+            launchConfetti();
+          } catch {
+            /* celebration is best-effort */
+          }
+        }
+        return;
+      }
+      // Still running (the endpoint already long-polled ~55s) — poll again.
+    }
+  })();
 }
 
 const state = reactive({
@@ -42,6 +74,7 @@ const state = reactive({
   sandboxMessage: "",
   sandboxId: localStorage.getItem(`${storagePrefix}:sandbox-id`) ?? "",
   temporalUiUrl: localStorage.getItem(`${storagePrefix}:temporal-ui-url`) ?? "",
+  workflowId: "",
   runnerPanel: "console",
   logs: [],
   spinner: "",
@@ -408,6 +441,8 @@ function setBusy(action, value) {
 // Returns true when the run completed without error.
 async function streamAction(action, extraBody) {
   runControllers[action]?.abort();
+  // A new run supersedes any in-flight completion watch from the previous one.
+  completionPoll?.abort();
   const controller = new AbortController();
   runControllers[action] = controller;
   setBusy(action, true);
@@ -438,6 +473,11 @@ async function streamAction(action, extraBody) {
     }
     await readEventStream(response.body);
     ok = true;
+    // Watch for the workflow to complete (now, or after the learner sends a
+    // signal / restarts the worker) and celebrate when it does.
+    if (state.sandboxId && state.workflowId) {
+      startCompletionPoll(state.sandboxId, state.workflowId);
+    }
   } catch (err) {
     if (err.name !== "AbortError") {
       state.logs.push(`ERROR: ${err.message}`);
@@ -529,22 +569,13 @@ function handleRunnerEvent({ kind, payload }) {
     localStorage.setItem(`${storagePrefix}:sandbox-id`, payload.sandboxId);
     localStorage.setItem(`${storagePrefix}:temporal-ui-url`, payload.uiUrl);
   } else if (kind === "result") {
+    // The workflow id powers the completion watch (see startCompletionPoll).
+    if (payload.workflowId) state.workflowId = payload.workflowId;
     // A worker-only run has no workflowResult; leave the output pane untouched.
     if (payload.workflowResult !== undefined) {
       state.workflowOutput = payload.workflowResult || "(no output)";
       state.runnerPanel = "output";
       state.logs.push("Click the Temporal UI button above to inspect (and signal) this workflow in the web UI.");
-      // Celebrate out-of-band so a confetti hiccup can never disrupt the stream
-      // handler (a throw here would otherwise bubble up and hide the output).
-      if (outputMatchesExpected(currentExercise.value.id, payload.workflowResult)) {
-        window.setTimeout(() => {
-          try {
-            launchConfetti();
-          } catch {
-            /* celebration is best-effort */
-          }
-        }, 0);
-      }
     }
     currentFiles.value.forEach((file) => {
       if (fileContent(file) === baseContent(file)) return;

@@ -1,11 +1,15 @@
 name: Fly Deploy
 
-# Deploys the course site + sandbox runner to Fly.io on every push to main.
+# Deploys the course site + sandbox runner to Fly.io on push to main. The LLM
+# proxy under litellm/ has its own workflow (fly-deploy-litellm.yml), so changes
+# there don't redeploy (and restart) the portal.
 # Requires a repo secret FLY_API_TOKEN (create one with `fly tokens create deploy`).
 on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'litellm/**'
   workflow_dispatch:
 
 concurrency:

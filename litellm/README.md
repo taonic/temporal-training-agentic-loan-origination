@@ -42,8 +42,16 @@ From this directory:
 
 ```bash
 fly launch --no-deploy --copy-config --name temporal-loan-llm-proxy
-fly secrets set OPENAI_API_KEY=sk-...real...
-fly secrets set LITELLM_MASTER_KEY=sk-...long-random-shared-key...
+
+# Load the real key from your environment instead of pasting it (keeps it out of
+# shell history): export OPENAI_API_KEY=sk-...real... first.
+fly secrets set OPENAI_API_KEY="$OPENAI_API_KEY"
+
+# Generate one strong shared key and reuse it for both apps (it's also the
+# LLM_PROXY_KEY the portal needs below). LiteLLM expects the sk- prefix.
+export LLM_PROXY_KEY="sk-$(openssl rand -hex 32)"
+fly secrets set LITELLM_MASTER_KEY="$LLM_PROXY_KEY"
+
 fly deploy
 ```
 
@@ -52,8 +60,10 @@ fly deploy
 The portal app (the one running `course-sandbox-runner.mjs`) needs two secrets:
 
 ```bash
+# Reuses the $LLM_PROXY_KEY you generated above, so the two apps share the key by
+# construction. (In a fresh shell, set it to the same value first.)
 fly secrets set LLM_PROXY_URL=https://temporal-loan-llm-proxy.fly.dev \
-                LLM_PROXY_KEY=sk-...same-as-LITELLM_MASTER_KEY... \
+                LLM_PROXY_KEY="$LLM_PROXY_KEY" \
                 -a temporal-agentic-loan-origination
 ```
 

@@ -52,8 +52,18 @@ async function run() {
     args: [application],
   });
 
+  // In the browser sandbox the runner sets TEMPORAL_UI_URL to this sandbox's
+  // Temporal UI; locally it's unset, so fall back to localhost.
+  const uiBase = process.env.TEMPORAL_UI_URL || 'http://localhost:8233';
+  const watchUrl = new URL(uiBase);
+  watchUrl.pathname = `/namespaces/default/workflows/${handle.workflowId}`;
+
   console.log(`Started ${handle.workflowId} (${which})`);
-  console.log(`Watch it at http://localhost:8233/namespaces/default/workflows/${handle.workflowId}`);
+  console.log(`Watch it at ${watchUrl}`);
+
+  // Close the connection so this process exits once the workflow is started.
+  // Otherwise the gRPC client keeps the event loop alive and the script hangs.
+  await connection.close();
 }
 
 run().catch((err) => {

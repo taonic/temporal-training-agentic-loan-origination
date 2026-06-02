@@ -6,7 +6,7 @@
 #   fly secrets set LLM_PROXY_URL=https://temporal-loan-llm-proxy.fly.dev
 #   fly secrets set LLM_PROXY_KEY=...          # the proxy's LITELLM_MASTER_KEY
 
-app = "temporal-agentic-loan-origination"
+app = "temporal-training-agentic-loan-origination"
 primary_region = "syd"
 
 [build]

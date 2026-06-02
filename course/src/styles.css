@@ -695,6 +695,32 @@ h2 {
   margin: 6px 0;
 }
 
+.markdown hr {
+  margin: 18px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.markdown table {
+  width: 100%;
+  margin: 12px 0 18px;
+  border-collapse: collapse;
+  font-size: 0.94em;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown th {
+  background: var(--off-white);
+  font-weight: 700;
+}
+
 .markdown a {
   color: var(--temporal-uv);
   font-weight: 740;
