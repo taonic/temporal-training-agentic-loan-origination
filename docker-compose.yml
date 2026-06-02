@@ -20,7 +20,6 @@
 services:
   ollama:
     image: ollama/ollama:latest
-    container_name: loan-demo-ollama
     ports:
       - "11434:11434"
     volumes:
@@ -51,7 +50,6 @@ services:
   # speaks the same "agent-model" / OpenAI-compatible /v1 shape as production.
   litellm:
     image: ghcr.io/berriai/litellm:main-stable
-    container_name: loan-demo-litellm
     profiles: ["proxy"]
     depends_on:
       ollama:

@@ -118,13 +118,10 @@ Take a moment to consolidate what you learned:
 1. When you killed the worker mid-pipeline, the workflow didn't fail or lose
    progress. Where does that in-progress state actually live, and what does a
    restarted worker do to rebuild it?
-2. Workflows must be deterministic, but activities can use I/O, clocks, and
-   randomness. Why does replay depend on keeping that side-effecting work inside
-   activities rather than in the workflow?
-3. Each `await` on an activity is a "durable checkpoint." What gets written to
+2. Each `await` on an activity is a "durable checkpoint." What gets written to
    history at that point, and why does that let the workflow survive a crash
    *between* two activities?
-4. The workflow just `await`s three calls in order, yet they may run on a
+3. The workflow just `await`s three calls in order, yet they may run on a
    different worker process (or machine). What is `proxyActivities` doing behind
    that simple `await`?
 

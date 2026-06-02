@@ -40,7 +40,7 @@ if [ "${1:-}" = "--proxy" ]; then
 fi
 
 echo "Starting Ollama (pulling $MODEL on first run — that's ~1GB, please wait)…"
-docker compose "${COMPOSE_ARGS[@]}" up -d
+docker compose "${COMPOSE_ARGS[@]}" up -d --remove-orphans
 
 # Poll Ollama's API until the model shows up (the one-shot ollama-pull container
 # downloads it in the background).

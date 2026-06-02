@@ -78,6 +78,7 @@ export function renderMarkdown(markdown) {
   let inCode = false;
   let codeLines = [];
   let codeLanguage = "";
+  let codeIndent = 0;
 
   const closeList = () => {
     if (list) {
@@ -96,6 +97,7 @@ export function renderMarkdown(markdown) {
     inCode = false;
     codeLines = [];
     codeLanguage = "";
+    codeIndent = 0;
   };
 
   // Consecutive plain-text lines form one paragraph: hard line wraps in the
@@ -115,21 +117,24 @@ export function renderMarkdown(markdown) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const fence = line.match(/^```(\S*)/);
+    // Fenced code, possibly indented inside a list item. Capture the indent so we
+    // can strip it from the body, and do NOT close an open list — a code block
+    // inside a numbered step should keep the step's numbering intact.
+    const fence = line.match(/^(\s*)```(\S*)/);
     if (fence) {
       if (inCode) {
         closeCode();
       } else {
         flushPara();
-        closeList();
         inCode = true;
-        codeLanguage = fence[1] ?? "";
+        codeIndent = fence[1].length;
+        codeLanguage = fence[2] ?? "";
       }
       continue;
     }
 
     if (inCode) {
-      codeLines.push(line);
+      codeLines.push(line.slice(codeIndent));
       continue;
     }
 
@@ -208,6 +213,15 @@ export function renderMarkdown(markdown) {
         )
         .join("")}</tbody>`;
       html.push(`<table>${thead}${tbody}</table>`);
+      continue;
+    }
+
+    // Continuation of the current list item: a hard-wrapped, indented line while
+    // a list is open. Append it to the last <li> (with a space) instead of
+    // closing the list and starting a stray paragraph.
+    if (list && /^\s+\S/.test(line) && html[html.length - 1]?.endsWith("</li>")) {
+      const last = html[html.length - 1];
+      html[html.length - 1] = `${last.slice(0, -5)} ${inlineMarkdown(line.trim())}</li>`;
       continue;
     }
 

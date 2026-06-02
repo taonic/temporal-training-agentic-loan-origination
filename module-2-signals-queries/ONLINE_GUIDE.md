@@ -140,12 +140,8 @@ human-in-the-loop pause.
 Take a moment to consolidate what you learned:
 
 1. The workflow parks at `condition(() => approved || rejected)`, possibly for
-   weeks. Where does that pending state live, and why doesn't it tie up a worker?
-2. The query handler returns `{ ...state }` rather than `state`. Why does handing
-   back a copy matter?
-3. What's the difference between delivering the approval as a **signal** versus
-   passing it as a workflow argument at start time?
-4. A signal arrives while the worker is down (Step 6). How does the workflow still
+   weeks. Where does that pending state live?
+2. A signal arrives while the worker is down (Step 6). How does the workflow still
    end up processing it once the worker returns?
 
 ---

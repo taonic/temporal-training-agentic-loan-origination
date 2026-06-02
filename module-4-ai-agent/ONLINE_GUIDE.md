@@ -120,11 +120,9 @@ Take a moment to consolidate what you learned:
 
 1. The model is non-deterministic, yet the workflow replays deterministically. How
    does putting `callAgentLLM` in an activity make that possible?
-2. When you killed the worker mid-loop, the finished tool calls weren't repeated on
-   resume. What did replay use to reconstruct the conversation so far?
-3. Why run the agent as a *child* workflow instead of inlining the loop in the parent?
+2. Why run the agent as a *child* workflow instead of inlining the loop in the parent?
    What do you gain in the UI, in retries, and in worker placement?
-4. The agent's recommendation is advisory and a human still approves. Why keep the
+3. The agent's recommendation is advisory and a human still approves. Why keep the
    human gate even when the model is confident?
 
 ---

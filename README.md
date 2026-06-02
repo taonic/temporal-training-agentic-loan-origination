@@ -48,12 +48,13 @@ temporal-training-agentic-loan-origination/
 
 ## Two ways to run this workshop
 
-- **In your browser (zero local setup)** — a Vue course site lets you edit each
-  module's code and run it live in an on-demand [Daytona](https://www.daytona.io/)
-  sandbox: a fresh Temporal dev server, your worker, and your loan application,
-  with a one-click link into the Temporal Web UI. Module 4's agent calls OpenAI
-  through a shared proxy — no per-student keys to manage. See
-  [Run it in the browser](#run-it-in-the-browser) below.
+- **In your browser (zero local setup)** — the
+  [live course site](https://temporal-training-agentic-loan-origination.fly.dev)
+  lets you edit each module's code and run it live in an on-demand sandbox: a fresh
+  Temporal dev server, your worker, and your loan application, with a one-click link
+  into the Temporal Web UI. Module 4's agent calls OpenAI through a shared proxy —
+  no per-student keys to manage. See [Run it in the browser](#run-it-in-the-browser)
+  below.
 - **Locally in four terminals** — the classic setup. See
   [How to run any module](#how-to-run-any-module). Module 4 calls OpenAI by
   default, or you can run it **fully offline** against a local qwen model — see
@@ -64,9 +65,11 @@ temporal-training-agentic-loan-origination/
 
 ## Run it in the browser
 
-The course site (`course/`) is a Vue + Vite app. The left panel is an editor with
-each module's source files; the right panel shows the module's instructions. Hit
-**Run** and a Daytona sandbox is provisioned that:
+Open the live course site at
+**https://temporal-training-agentic-loan-origination.fly.dev** (or a link your
+instructor shares). The left panel is an editor with each module's source files;
+the right panel shows the module's instructions. Hit **Run** and a fresh sandbox is
+provisioned that:
 
 1. starts a Temporal dev server,
 2. installs and starts your edited worker,
@@ -75,66 +78,11 @@ each module's source files; the right panel shows the module's instructions. Hit
    and, from Module 2 on, **send approve / reject / retry signals** to drive your
    paused workflow.
 
-For Module 4 the runner points the sandbox at a shared
-[LiteLLM](https://docs.litellm.ai/) proxy (injecting its URL + shared key), so the
-agent calls OpenAI without the real OpenAI key ever reaching student-editable code.
-All modules use the same lightweight sandbox image (Node + the Temporal CLI). See
-[litellm/README.md](litellm/README.md) for the proxy setup.
+For Module 4, the agent calls OpenAI through a shared proxy, so there are **no API
+keys for you to manage** — and your edited code never sees a real key.
 
-### Develop the course site locally
-
-```bash
-npm install
-
-# Terminal A — the Daytona-backed runner (needs a Daytona API key)
-DAYTONA_KEY=your_daytona_key npm run course:sandbox
-
-# Terminal B — the Vue dev server (proxies /api to the runner)
-npm run course:serve
-# open http://127.0.0.1:4173
-```
-
-Course data is generated from each `module-*/README.md` and the files under
-`module-*/starter/src` (with `module-*/solution/src` behind the "solution"
-toggle). Editing any of those regenerates the site automatically.
-
-```bash
-npm run course:build   # build the static bundle into course/dist
-```
-
-### Deploy
-
-Two small [Fly.io](https://fly.io) apps:
-
-**1. The course portal.** A single Node process serves the built site **and** the
-`/api` runner from one origin (`COURSE_DIST_DIR` switches it on). The included
-`Dockerfile`, `fly.toml`, and GitHub Actions workflow deploy it:
-
-```bash
-fly secrets set DAYTONA_KEY="$DAYTONA_KEY"
-# So the runner can point Module 4 sandboxes at the LLM proxy (deployed below):
-fly secrets set LLM_PROXY_URL=https://temporal-loan-llm-proxy.fly.dev \
-                LLM_PROXY_KEY="$LLM_PROXY_KEY"
-fly deploy
-```
-
-Pushes to `main` redeploy this automatically once the `FLY_API_TOKEN` repo secret
-is set.
-
-**2. The LLM proxy.** Holds the **real OpenAI key** so it never reaches a sandbox,
-and exposes a single shared key (the same value as `LLM_PROXY_KEY` above) behind a
-global rate limit. No database. Deploy from [`litellm/`](litellm/) (full steps in
-[litellm/README.md](litellm/README.md)):
-
-```bash
-cd litellm
-fly secrets set OPENAI_API_KEY=sk-...real... LITELLM_MASTER_KEY=sk-...shared-key...
-fly deploy
-# then set a hard spend cap on that OpenAI project — your budget backstop
-```
-
-The proxy is deployed manually (re-run `fly deploy` from `litellm/` when its config
-changes); it isn't wired into CI.
+> **Hosting or developing the course site?** Running it locally and deploying it
+> (Fly.io + the LLM proxy) are covered in [DEPLOY.md](./DEPLOY.md).
 
 ---
 
