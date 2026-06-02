@@ -34,10 +34,23 @@ temporal server start-dev
 
 ## Step 1 — Define the query and signals
 
-Open [starter/src/workflows.ts](./starter/src/workflows.ts). At **module scope**
-(outside the function), declare a query and two signals, and import `defineQuery`,
-`defineSignal`, `setHandler`, and `condition` from `@temporalio/workflow` (plus
-`CancelRequest` from `./models`):
+Open [starter/src/workflows.ts](./starter/src/workflows.ts). First, expand the
+`@temporalio/workflow` import to pull in the helpers you'll use this module, and add
+`CancelRequest` to the `./models` import:
+
+```ts
+import {
+  proxyActivities,
+  defineQuery,
+  defineSignal,
+  setHandler,
+  condition,
+} from '@temporalio/workflow';
+import type * as activities from './activities';
+import type { CancelRequest, LoanApplication, LoanState } from './models';
+```
+
+Then, at **module scope** (outside the function), declare a query and two signals:
 
 ```ts
 export const getStateQuery = defineQuery<LoanState>('getState');
@@ -73,7 +86,7 @@ can't mutate live workflow state.
 
 ## Step 3 — Pause until a human decides
 
-After underwriting, park at `PENDING_APPROVAL` and block on a flag:
+After `underwrite` Activity, park at `PENDING_APPROVAL` and block on a flag:
 
 ```ts
 state.status = 'PENDING_APPROVAL';

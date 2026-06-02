@@ -15,9 +15,23 @@ and signal your workflow.
 
 ## Step 1 — Define the query and signals
 
-Open the **`workflows.ts`** tab. At **module scope** (outside the function), declare
-a query and two signals, and import `defineQuery`, `defineSignal`, `setHandler`, and
-`condition` from `@temporalio/workflow` (plus `CancelRequest` from `./models`):
+Open the **`workflows.ts`** tab. First, expand the `@temporalio/workflow` import to
+pull in the helpers you'll use this module, and add `CancelRequest` to the `./models`
+import:
+
+```ts
+import {
+  proxyActivities,
+  defineQuery,
+  defineSignal,
+  setHandler,
+  condition,
+} from '@temporalio/workflow';
+import type * as activities from './activities';
+import type { CancelRequest, LoanApplication, LoanState } from './models';
+```
+
+Then, at **module scope** (outside the function), declare a query and two signals:
 
 ```ts
 export const getStateQuery = defineQuery<LoanState>('getState');
@@ -54,7 +68,7 @@ setHandler(rejectSignal, (req: CancelRequest) => {
 
 ## Step 3 — Pause until a human decides
 
-After underwriting, set the status to `PENDING_APPROVAL` and **block** until one of
+After `underwrite` Activity, set the status to `PENDING_APPROVAL` and **block** until one of
 the flags flips:
 
 ```ts

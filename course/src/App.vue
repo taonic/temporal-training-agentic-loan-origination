@@ -1,10 +1,17 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 
+import { basicSetup } from "codemirror";
+import { EditorView, keymap } from "@codemirror/view";
+import { EditorState } from "@codemirror/state";
+import { indentWithTab } from "@codemirror/commands";
+import { indentUnit } from "@codemirror/language";
+import { javascript } from "@codemirror/lang-javascript";
+import { oneDark } from "@codemirror/theme-one-dark";
+
 import { launchConfetti } from "./confetti.js";
 import Tour from "./Tour.vue";
 import {
-  highlightCode,
   labelForPath,
   renderMarkdown,
   splitWalkthrough,
@@ -145,8 +152,8 @@ function finishTour() {
   localStorage.setItem(tourSeenKey, "1");
 }
 
-const editorRef = ref(null);
-const highlightRef = ref(null);
+const editorHostRef = ref(null);
+let editorView = null;
 const consoleRef = ref(null);
 
 // Tailing pins the console to the newest output. We stop pinning the moment the
@@ -164,7 +171,6 @@ let toastTimer = 0;
 // fully independent (one in flight never cancels or disables the other).
 const runControllers = { worker: null, starter: null, all: null };
 
-const highlightedCode = computed(() => `${highlightCode(editorValue.value)}\n`);
 const themeToggleLabel = computed(() => (state.theme === "dark" ? "Light mode" : "Dark mode"));
 const viewToggleLabel = computed(() =>
   state.fileView === "solution" ? "Switch to exercise" : "Switch to solution",
@@ -341,12 +347,6 @@ function applyTheme(theme) {
   localStorage.setItem(`${storagePrefix}:theme`, theme);
 }
 
-function syncEditorScroll() {
-  if (!editorRef.value || !highlightRef.value) return;
-  highlightRef.value.scrollTop = editorRef.value.scrollTop;
-  highlightRef.value.scrollLeft = editorRef.value.scrollLeft;
-}
-
 // Drag-driven splitters. `onMove` maps the pointer position to a size, `persist`
 // stores the final value, and we clamp inside each move so the panes stay usable.
 function startDrag(event, onMove, persist) {
@@ -398,17 +398,45 @@ function startDockResize(event) {
   );
 }
 
-function handleEditorKeydown(event) {
-  if (event.key !== "Tab") return;
-  event.preventDefault();
-  const target = event.target;
-  const start = target.selectionStart;
-  const end = target.selectionEnd;
-  editorValue.value = `${editorValue.value.slice(0, start)}  ${editorValue.value.slice(end)}`;
-  nextTick(() => {
-    target.selectionStart = start + 2;
-    target.selectionEnd = start + 2;
+// --- CodeMirror editor -----------------------------------------------------
+// A CodeMirror 6 instance backs the editor. `editorValue` stays the single source
+// of truth: the update listener pushes the learner's edits out, and setEditorDoc()
+// pushes programmatic changes (file switch / reset / solution toggle) back in with
+// a fresh state, so undo history doesn't bleed across files.
+const editorTheme = EditorView.theme(
+  {
+    "&": { height: "100%", fontSize: "13px", backgroundColor: "#1d1d1f" },
+    "&.cm-focused": { outline: "none" },
+    ".cm-scroller": {
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+      lineHeight: "1.55",
+    },
+    ".cm-gutters": { backgroundColor: "#1d1d1f", border: "none" },
+  },
+  { dark: true },
+);
+
+function makeEditorState(doc) {
+  return EditorState.create({
+    doc,
+    extensions: [
+      basicSetup,
+      keymap.of([indentWithTab]), // Tab indents the selection, Shift+Tab outdents
+      javascript({ typescript: true }),
+      indentUnit.of("  "),
+      EditorState.tabSize.of(2),
+      oneDark,
+      editorTheme,
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) editorValue.value = update.state.doc.toString();
+      }),
+    ],
   });
+}
+
+function setEditorDoc(text) {
+  if (!editorView || text === editorView.state.doc.toString()) return;
+  editorView.setState(makeEditorState(text));
 }
 
 async function checkSandbox() {
@@ -614,7 +642,10 @@ function clearSandboxState() {
   localStorage.removeItem(`${storagePrefix}:temporal-ui-url`);
 }
 
-watch(editorValue, persistCurrentEdit);
+watch(editorValue, (value) => {
+  persistCurrentEdit();
+  setEditorDoc(value);
+});
 
 // Keep the freshest console output in view as logs/spinner stream in (and when
 // the console tab is reopened), unless the user has scrolled up to read back.
@@ -646,6 +677,10 @@ watch(
 );
 
 onMounted(() => {
+  editorView = new EditorView({
+    state: makeEditorState(editorValue.value),
+    parent: editorHostRef.value,
+  });
   // Exposed for quick manual testing in the DevTools console: launchConfetti().
   window.launchConfetti = launchConfetti;
   checkSandbox();
@@ -662,6 +697,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  editorView?.destroy();
   Object.values(runControllers).forEach((controller) => controller?.abort());
   window.clearTimeout(toastTimer);
 });
@@ -737,19 +773,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="editor-shell" data-tour="editor">
-          <pre ref="highlightRef" class="code-highlight" aria-hidden="true"><code v-html="highlightedCode" /></pre>
-          <textarea
-            ref="editorRef"
-            v-model="editorValue"
-            class="code-editor"
-            spellcheck="false"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            wrap="off"
-            @keydown="handleEditorKeydown"
-            @scroll="syncEditorScroll"
-          />
+          <div ref="editorHostRef" class="code-mirror-host"></div>
         </div>
         <div class="dock-resizer" data-cursor="row-resize" role="separator" aria-orientation="horizontal" aria-label="Resize runner panel" @pointerdown="startDockResize" />
         <div class="runner-dock" :style="{ height: state.dockHeight || undefined }">

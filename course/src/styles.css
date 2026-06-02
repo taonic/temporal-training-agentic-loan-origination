@@ -463,52 +463,18 @@ h2 {
   flex: 1 1 auto;
   min-height: 120px;
   overflow: hidden;
-  background: var(--code-panel);
+  background: #1d1d1f;
 }
 
-.editor-shell .code-highlight,
-.editor-shell .code-editor {
-  margin: 0;
-  border: 0;
-  padding: 16px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 13px;
-  line-height: 1.55;
-  tab-size: 2;
-  letter-spacing: normal;
-  white-space: pre;
-  overflow-wrap: normal;
-  word-break: normal;
-}
-
-.code-highlight {
+/* CodeMirror 6 fills the editor shell; the one-dark theme handles token colors. */
+.code-mirror-host {
   position: absolute;
   inset: 0;
-  overflow: hidden;
-  color: var(--code-ink);
-  background: var(--code-panel);
-  pointer-events: none;
 }
 
-.code-highlight code {
-  font: inherit;
-}
-
-.code-editor {
-  position: absolute;
-  inset: 0;
-  width: 100%;
+.editor-shell .cm-editor {
   height: 100%;
-  resize: none;
-  outline: 0;
-  overflow: auto;
-  background: transparent;
-  color: transparent;
-  caret-color: var(--code-ink);
-}
-
-.code-editor::selection {
-  background: rgba(129, 140, 248, 0.35);
+  background: #0d0d10;
 }
 
 /* Token palette (tuned for the dark editor surface, used in both themes). */
