@@ -41,7 +41,6 @@ export interface LoanState {
   completedActivities: string[];
   fixHistory: FixEntry[];
   application: LoanApplication;
-  rejectReason: string;
   agentRecommendation?: AgentRecommendation;
 }
 
@@ -49,11 +48,6 @@ export interface LoanState {
 export interface RetryUpdate {
   key?: keyof LoanApplication | '';
   value?: string;
-}
-
-// Payload of the reject signal.
-export interface CancelRequest {
-  reason: string;
 }
 
 // ---------- Agent types ----------

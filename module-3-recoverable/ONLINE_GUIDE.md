@@ -5,7 +5,7 @@ the data with a **signal**, and **retry** — instead of failing the whole loan.
 
 **Time:** ~20 min · **You'll edit:** the `workflows.ts` tab.
 
-**Run** here submits the **`bad-ssn`** scenario (`LOAN-002`) on purpose: its SSN is
+**Run** here submits the **`bad-ssn`** scenario (`LOAN-RECOVERY-002`) on purpose: its SSN is
 invalid, so the credit check throws `ApplicationFailure.nonRetryable(...)`. With the
 starter code that just **fails** the workflow. Your job is to make it pause and wait
 for a fix. This module's starter contains the Module 2 solution (query + approval).
@@ -79,16 +79,16 @@ await recoverableStep('underwrite', () =>
 
 ## Step 4 — Run it
 
-Hit **Run**. `LOAN-002` stops at `PENDING_FIX` on `runCreditCheck` (bad SSN).
+Hit **Run**. `LOAN-RECOVERY-002` stops at `PENDING_FIX` on `runCreditCheck` (bad SSN).
 
-✓ **Checkpoint:** open the **Temporal UI** button → `LOAN-002` is **Running**,
+✓ **Checkpoint:** open the **Temporal UI** button → `LOAN-RECOVERY-002` is **Running**,
 parked at the failed credit check. It did **not** fail outright.
 
 ---
 
 ## Step 5 — Fix it, then approve, from the Temporal UI
 
-Click the **Temporal UI** button and open the running workflow **`LOAN-002`**. Both
+Click the **Temporal UI** button and open the running workflow **`LOAN-RECOVERY-002`**. Both
 steps use the workflow page's actions menu, **top-right** (under *Workflow Actions*)
 → **Send a Signal**:
 
@@ -108,7 +108,7 @@ auto-retried; `nonRetryable` is what lets you wait for human input instead.
 
 ## Step 6 — Witness durability (the paused fix survives a crash)
 
-1. Run it and let `LOAN-002` park at `PENDING_FIX`.
+1. Run it and let `LOAN-RECOVERY-002` park at `PENDING_FIX`.
 2. Click **■** next to **`worker.ts`** to kill the worker — the workflow stays
    **Running** in the UI, still waiting for its fix.
 3. Click **▶** to restart the worker, then send the `retry` signal (and then

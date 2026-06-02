@@ -19,7 +19,7 @@ npx ts-node module-3-recoverable/starter/src/client.ts bad-ssn
 
 The activities already throw `ApplicationFailure.nonRetryable(...)` on bad input
 (see [starter/src/activities.ts](./starter/src/activities.ts)). With the starter
-code, `LOAN-002` will just **fail** at the credit check. Your job is to make it
+code, `LOAN-RECOVERY-002` will just **fail** at the credit check. Your job is to make it
 *pause and wait for a fix* instead.
 
 ## Your task
@@ -38,10 +38,10 @@ Edit [starter/src/workflows.ts](./starter/src/workflows.ts) and complete the
 
 ## Try it
 
-`LOAN-002` will be stuck at `PENDING_FIX` on `runCreditCheck`. Fix the SSN:
+`LOAN-RECOVERY-002` will be stuck at `PENDING_FIX` on `runCreditCheck`. Fix the SSN:
 
 ```bash
-temporal workflow signal --workflow-id LOAN-002 --name retry \
+temporal workflow signal --workflow-id LOAN-RECOVERY-002 --name retry \
   --input '{"key":"ssn","value":"222-33-4444"}'
 ```
 

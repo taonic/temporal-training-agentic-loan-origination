@@ -80,13 +80,13 @@ how a workflow waits for a human.
 Hit **Run**. The pipeline executes, then the workflow parks at `PENDING_APPROVAL`.
 
 ✓ **Checkpoint:** the console shows the loan submitted. Open the **Temporal UI**
-button and click into `LOAN-001` — it's **Running**, sitting at the approval gate.
+button and click into `LOAN-SIGNALS-001` — it's **Running**, sitting at the approval gate.
 
 ---
 
 ## Step 5 — Query and signal from the Temporal UI
 
-Click the **Temporal UI** button and open the running workflow **`LOAN-001`**. Both
+Click the **Temporal UI** button and open the running workflow **`LOAN-SIGNALS-001`**. Both
 actions below live in the workflow page's actions menu, **top-right** (under
 *Workflow Actions*).
 

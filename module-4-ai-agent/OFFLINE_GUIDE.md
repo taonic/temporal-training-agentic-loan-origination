@@ -255,8 +255,8 @@ npx ts-node module-4-ai-agent/starter/src/worker.ts
 npx ts-node module-4-ai-agent/starter/src/client.ts
 ```
 
-✓ **Checkpoint:** in the UI, alongside `LOAN-001` you'll see a **second workflow**,
-`LOAN-001-agent`, with one activity per model turn and one per tool call
+✓ **Checkpoint:** in the UI, alongside `LOAN-AGENT-001` you'll see a **second workflow**,
+`LOAN-AGENT-001-agent`, with one activity per model turn and one per tool call
 (`lookupFullCreditReport`, `checkComplianceWatchlist`). The parent then parks at
 `PENDING_APPROVAL`.
 
@@ -273,7 +273,7 @@ npx ts-node module-4-ai-agent/starter/src/client.ts
 The agent's recommendation is advisory — a human still decides:
 
 ```bash
-temporal workflow signal --workflow-id LOAN-001 --name approveApplication
+temporal workflow signal --workflow-id LOAN-AGENT-001 --name approveApplication
 ```
 
 ✓ **Checkpoint:** the workflow reaches **Completed**. (Run it in the browser course
@@ -283,7 +283,7 @@ site to also get a confetti celebration on completion.)
 
 ## Step 6 — Witness durability (kill the worker mid-think)
 
-1. Start a clean loan and watch `LOAN-001-agent` make tool calls.
+1. Start a clean loan and watch `LOAN-AGENT-001-agent` make tool calls.
 2. While it's mid-loop, **kill the worker** (Ctrl-C in Terminal 2). The completed
    turns are recorded in history.
 3. **Restart the worker.**

@@ -97,16 +97,16 @@ In **Terminal 3**, submit a loan application:
 npx ts-node module-1-durable-pipeline/starter/src/client.ts
 ```
 
-✓ **Checkpoint:** the client prints `Started LOAN-001 (clean)` and a watch URL,
+✓ **Checkpoint:** the client prints `Started LOAN-PIPELINE-001 (clean)` and a watch URL,
 then exits right away — it *starts* the workflow without waiting for it. Open that
-URL (or http://localhost:8233 → `LOAN-001`) and watch: over ~8 seconds the
+URL (or http://localhost:8233 → `LOAN-PIPELINE-001`) and watch: over ~8 seconds the
 **History** tab fills with three `ActivityTaskCompleted` events and the workflow
 reaches **Completed** with status `UNDERWRITTEN`.
 
 To read the final state from the CLI instead:
 
 ```bash
-temporal workflow show --workflow-id LOAN-001
+temporal workflow show --workflow-id LOAN-PIPELINE-001
 ```
 
 > Workflow **completes instantly with no activity events** (status stays
@@ -125,7 +125,7 @@ Now break it on purpose and watch Temporal shrug it off.
    ```
 2. While the activities are still running (you have ~8s), **kill the worker** in
    **Terminal 2** with **Ctrl-C**.
-3. Open `LOAN-001` in the Temporal UI and refresh.
+3. Open `LOAN-PIPELINE-001` in the Temporal UI and refresh.
    ✓ **Observe:** the workflow is **not failed** — it's just *waiting*. The
    activities completed so far are recorded; the rest are pending.
 4. **Restart the worker** in Terminal 2:

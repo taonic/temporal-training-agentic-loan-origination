@@ -8,7 +8,6 @@ import {
 } from '@temporalio/workflow';
 import type * as activities from './activities';
 import type {
-  CancelRequest,
   LoanApplication,
   LoanState,
   LoanStatus,
@@ -21,7 +20,7 @@ const { verifyIncome, runCreditCheck, underwrite } = proxyActivities<typeof acti
 
 export const getStateQuery = defineQuery<LoanState>('getState');
 export const approvalSignal = defineSignal<[]>('approveApplication');
-export const rejectSignal = defineSignal<[CancelRequest]>('rejectApplication');
+export const rejectSignal = defineSignal<[]>('rejectApplication');
 // The retry signal carries a field patch to fix bad data.
 export const retrySignal = defineSignal<[RetryUpdate]>('retry');
 
@@ -33,7 +32,6 @@ export async function homeLoanWorkflow(application: LoanApplication): Promise<Lo
     completedActivities: [],
     fixHistory: [],
     application: { ...application },
-    rejectReason: '',
     agentRecommendation: undefined,
   };
 
@@ -47,9 +45,8 @@ export async function homeLoanWorkflow(application: LoanApplication): Promise<Lo
   setHandler(approvalSignal, () => {
     approved = true;
   });
-  setHandler(rejectSignal, (req: CancelRequest) => {
+  setHandler(rejectSignal, () => {
     rejected = true;
-    state.rejectReason = req.reason || 'No reason provided';
   });
 
   // The retry signal patches one field on the application, then unblocks the

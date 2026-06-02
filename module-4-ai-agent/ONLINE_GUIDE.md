@@ -204,8 +204,8 @@ outage degrades to an `ESCALATE` recommendation rather than crashing the whole l
 
 Hit **Run** (the first run provisions the sandbox, so give it a moment).
 
-✓ **Checkpoint:** open the **Temporal UI** button. Alongside `LOAN-001` you'll see a
-**second workflow**, `LOAN-001-agent`, with one activity per model turn and one per
+✓ **Checkpoint:** open the **Temporal UI** button. Alongside `LOAN-AGENT-001` you'll see a
+**second workflow**, `LOAN-AGENT-001-agent`, with one activity per model turn and one per
 tool call (`lookupFullCreditReport`, `checkComplianceWatchlist`). That's the agent's
 reasoning, made durable. The parent then parks at `PENDING_APPROVAL`.
 
@@ -216,7 +216,7 @@ reasoning, made durable. The parent then parks at `PENDING_APPROVAL`.
 The agent's recommendation is advisory — a human still decides. Send the approval
 **signal** from the Temporal UI:
 
-1. Click the **Temporal UI** button and open the running workflow **`LOAN-001`**.
+1. Click the **Temporal UI** button and open the running workflow **`LOAN-AGENT-001`**.
 2. On the workflow page, open the actions menu in the **top-right** and choose
    **Send a Signal** (listed under *Workflow Actions*).
 3. In the dialog, set **Signal name** to `approveApplication` and leave the
@@ -231,7 +231,7 @@ confetti. (To see the decline path instead, send `rejectApplication` — like
 
 ## Step 5 — Witness durability (kill the worker mid-think)
 
-1. Hit **Run** and watch `LOAN-001-agent` start making tool calls.
+1. Hit **Run** and watch `LOAN-AGENT-001-agent` start making tool calls.
 2. While it's mid-loop, click **■** next to **`worker.ts`** to kill the worker.
 3. The agent child is **Running** but paused — its completed turns are recorded in
    history.

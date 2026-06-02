@@ -53,7 +53,7 @@ a credit-inquiry withdrawal.
 
 5. **Try it:**
    ```bash
-   temporal workflow signal --workflow-id LOAN-001 --name cancelApplication \
+   temporal workflow signal --workflow-id LOAN-AGENT-001 --name cancelApplication \
      --input '{"reason":"Applicant withdrew"}'
    ```
    Watch the credit-inquiry withdrawal run, then the workflow finish.

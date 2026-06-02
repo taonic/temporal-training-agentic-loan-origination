@@ -64,10 +64,10 @@ Your edits autosave in the browser.
 ## Step 3 — Run it
 
 Hit **Run** in the dock. It provisions a sandbox, starts your worker, and submits
-loan `LOAN-001`.
+loan `LOAN-PIPELINE-001`.
 
-✓ **Checkpoint:** the console shows the worker starting and `LOAN-001` being
-submitted. Click the **Temporal UI** button, open `LOAN-001`, and over ~8 seconds
+✓ **Checkpoint:** the console shows the worker starting and `LOAN-PIPELINE-001` being
+submitted. Click the **Temporal UI** button, open `LOAN-PIPELINE-001`, and over ~8 seconds
 the **History** tab fills with three `ActivityTaskCompleted` events — one per
 activity. The workflow finishes as **Completed**, and its result shows
 `status: 'UNDERWRITTEN'` with all three names in `completedActivities`.
@@ -85,7 +85,7 @@ This is the lesson. Break it on purpose and watch Temporal shrug it off.
 1. Hit **Run** to start a fresh loan.
 2. **While the activities are still running** (~8s window), click the **■** (stop)
    button next to the **`worker.ts`** tab to kill the worker.
-3. Refresh `LOAN-001` in the Temporal UI.
+3. Refresh `LOAN-PIPELINE-001` in the Temporal UI.
    ✓ **Observe:** the workflow is **not failed** — it's just *waiting*. The
    activities that finished are recorded; the rest are pending.
 4. Click the **▶** (start) button next to the **`worker.ts`** tab to bring the

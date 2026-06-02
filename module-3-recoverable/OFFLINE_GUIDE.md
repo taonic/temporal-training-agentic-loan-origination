@@ -100,7 +100,7 @@ npx ts-node module-3-recoverable/starter/src/worker.ts
 npx ts-node module-3-recoverable/starter/src/client.ts bad-ssn
 ```
 
-✓ **Checkpoint:** `LOAN-002` stops at `PENDING_FIX` on `runCreditCheck` (in the UI
+✓ **Checkpoint:** `LOAN-RECOVERY-002` stops at `PENDING_FIX` on `runCreditCheck` (in the UI
 at http://localhost:8233). It did **not** fail outright.
 
 ---
@@ -109,15 +109,15 @@ at http://localhost:8233). It did **not** fail outright.
 
 ```bash
 # patch the bad SSN → retries the credit check and continues the pipeline
-temporal workflow signal --workflow-id LOAN-002 --name retry \
+temporal workflow signal --workflow-id LOAN-RECOVERY-002 --name retry \
   --input '{"key":"ssn","value":"222-33-4444"}'
 
 # the loan then parks at PENDING_APPROVAL (Module 2's gate) — approve it
-temporal workflow signal --workflow-id LOAN-002 --name approveApplication
+temporal workflow signal --workflow-id LOAN-RECOVERY-002 --name approveApplication
 ```
 
 ✓ **Checkpoint:** the workflow reaches **Completed**. The fix is recorded in
-`fixHistory` — see it with `temporal workflow query --workflow-id LOAN-002 --type getState`.
+`fixHistory` — see it with `temporal workflow query --workflow-id LOAN-RECOVERY-002 --type getState`.
 
 ---
 

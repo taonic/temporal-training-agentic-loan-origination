@@ -98,24 +98,24 @@ npx ts-node module-2-signals-queries/starter/src/worker.ts
 npx ts-node module-2-signals-queries/starter/src/client.ts
 ```
 
-✓ **Checkpoint:** `LOAN-001` runs the pipeline, then sits at `PENDING_APPROVAL` in
+✓ **Checkpoint:** `LOAN-SIGNALS-001` runs the pipeline, then sits at `PENDING_APPROVAL` in
 the UI (http://localhost:8233).
 
 ---
 
 ## Step 5 — Query and signal from the CLI (fully offline)
 
-While `LOAN-001` is paused:
+While `LOAN-SIGNALS-001` is paused:
 
 ```bash
 # read live state without affecting the workflow
-temporal workflow query --workflow-id LOAN-001 --type getState
+temporal workflow query --workflow-id LOAN-SIGNALS-001 --type getState
 
 # approve it → APPROVED → workflow completes
-temporal workflow signal --workflow-id LOAN-001 --name approveApplication
+temporal workflow signal --workflow-id LOAN-SIGNALS-001 --name approveApplication
 
 # ...or reject it with a reason → REJECTED
-temporal workflow signal --workflow-id LOAN-001 --name rejectApplication \
+temporal workflow signal --workflow-id LOAN-SIGNALS-001 --name rejectApplication \
   --input '{"reason":"Policy exception"}'
 ```
 

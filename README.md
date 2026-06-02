@@ -125,7 +125,7 @@ npx ts-node <module-folder>/starter/src/client.ts
 #   add `bad-ssn` to start a failing application (used in Module 3)
 
 # Terminal 4 — send signals / run queries (Module 2 onward)
-#   e.g. temporal workflow query --workflow-id LOAN-001 --type getState
+#   e.g. temporal workflow query --workflow-id LOAN-SIGNALS-001 --type getState
 ```
 
 > The worker does **not** hot-reload. After editing a workflow or activity, stop

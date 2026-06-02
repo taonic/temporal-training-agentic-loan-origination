@@ -14,7 +14,7 @@ npx ts-node module-1-durable-pipeline/starter/src/worker.ts
 npx ts-node module-1-durable-pipeline/starter/src/client.ts
 ```
 
-Open **http://localhost:8233**, click into `LOAN-001`, and watch the activities run.
+Open **http://localhost:8233**, click into `LOAN-PIPELINE-001`, and watch the activities run.
 
 ## Your task
 

@@ -12,7 +12,7 @@ import type { LoanApplication } from './models';
 
 const scenarios: Record<string, LoanApplication> = {
   clean: {
-    applicationId: 'LOAN-001',
+    applicationId: 'LOAN-PIPELINE-001',
     applicantName: 'Alice Johnson',
     ssn: '123-45-6789',
     employerName: 'Acme Corp',
@@ -23,7 +23,7 @@ const scenarios: Record<string, LoanApplication> = {
     downPayment: 70000,
   },
   'bad-ssn': {
-    applicationId: 'LOAN-002',
+    applicationId: 'LOAN-PIPELINE-002',
     applicantName: 'Bob Smith',
     ssn: '000-00-0000', // credit check rejects this — fix it with a `retry` signal
     employerName: 'TechCo',

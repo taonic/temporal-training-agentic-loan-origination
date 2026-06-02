@@ -35,13 +35,13 @@ While a workflow is paused at `PENDING_APPROVAL` (Terminal 4):
 
 ```bash
 # read the live state without affecting the workflow
-temporal workflow query --workflow-id LOAN-001 --type getState
+temporal workflow query --workflow-id LOAN-SIGNALS-001 --type getState
 
 # approve it
-temporal workflow signal --workflow-id LOAN-001 --name approveApplication
+temporal workflow signal --workflow-id LOAN-SIGNALS-001 --name approveApplication
 
 # ...or reject it with a reason
-temporal workflow signal --workflow-id LOAN-001 --name rejectApplication \
+temporal workflow signal --workflow-id LOAN-SIGNALS-001 --name rejectApplication \
   --input '{"reason":"Policy exception"}'
 ```
 

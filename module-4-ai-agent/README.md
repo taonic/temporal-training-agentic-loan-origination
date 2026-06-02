@@ -54,7 +54,7 @@ state.agentRecommendation = await executeChild(underwritingAgentWorkflow, {
 
 ## What to look for
 
-In the Temporal UI you'll now see a **second workflow**, `LOAN-001-agent`, with
+In the Temporal UI you'll now see a **second workflow**, `LOAN-AGENT-001-agent`, with
 one activity per model turn and one per tool call — the agent's reasoning, made
 durable and replayable.
 
