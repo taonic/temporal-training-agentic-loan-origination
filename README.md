@@ -119,8 +119,7 @@ fly deploy
 ```
 
 Pushes to `main` redeploy this automatically once the `FLY_API_TOKEN` repo secret
-is set. Because the proxy (below) shares that secret, use an **org-scoped** token
-that can deploy both apps: `fly tokens create org <org-slug>`.
+is set.
 
 **2. The LLM proxy.** Holds the **real OpenAI key** so it never reaches a sandbox,
 and exposes a single shared key (the same value as `LLM_PROXY_KEY` above) behind a
@@ -134,8 +133,8 @@ fly deploy
 # then set a hard spend cap on that OpenAI project — your budget backstop
 ```
 
-After this first manual deploy, pushes to `main` that touch `litellm/` redeploy the
-proxy automatically via [`.github/workflows/fly-deploy-litellm.yml`](.github/workflows/fly-deploy-litellm.yml).
+The proxy is deployed manually (re-run `fly deploy` from `litellm/` when its config
+changes); it isn't wired into CI.
 
 ---
 
