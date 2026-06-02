@@ -12,68 +12,159 @@ for a fix. This module's starter contains the Module 2 solution (query + approva
 
 ---
 
-## Step 1 — Add a retry signal
+## Step 1 — Declare the retry signal
 
-Open the **`workflows.ts`** tab. Declare a `retry` signal at module scope and import
-`RetryUpdate` from `./models`:
+Open the **`workflows.ts`** tab. First, add `LoanStatus` and `RetryUpdate` to the
+existing `./models` import:
 
 ```ts
+import type {
+  LoanApplication,
+  LoanState,
+  LoanStatus,
+  RetryUpdate,
+} from './models';
+```
+
+Then declare the signal at module scope, next to the other signals:
+
+```ts
+// The retry signal carries a field patch to fix bad data.
 export const retrySignal = defineSignal<[RetryUpdate]>('retry');
 ```
 
-Inside the workflow, add a `retryRequested` flag and a handler that patches one
-field on the application (parsing numbers for `annualIncome` / `loanAmount` /
-`downPayment`), records a `FixEntry` on `state.fixHistory`, then unblocks the wait:
-
-```ts
-let retryRequested = false;
-setHandler(retrySignal, (update: RetryUpdate) => {
-  // patch app[update.key], push onto state.fixHistory...
-  retryRequested = true;
-});
-```
-
-**Why:** the signal carries the *fix* from a human (the corrected SSN) into the
-running workflow.
+**Why:** this signal is how the human's *fix* (the corrected SSN) gets into the
+running workflow. Its payload, `RetryUpdate`, is just `{ key, value }` — which field
+to patch and its new value.
 
 ---
 
-## Step 2 — Write the recoverable helper
+## Step 2 — Fill in the workflow body
 
-Wrap an activity call so a non-retryable failure **pauses** instead of crashing:
+Inside the workflow, find the `// TODO` comment block (between the existing signal
+handlers and the `await verifyIncome(...)` calls). Delete the whole TODO block and
+paste these three chunks in its place, in order.
+
+### 2a — The retry flag and handler (where the fix is applied)
 
 ```ts
-const recoverableStep = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
-  while (true) {
-    try {
-      return await fn();
-    } catch (e: any) {
-      setStatus('PENDING_FIX', name, e.cause?.message || e.message || String(e));
-      retryRequested = false;
-      await condition(() => retryRequested);   // wait for the fix
-      setStatus('STARTED');                     // then loop and retry
+  let retryRequested = false;
+
+  // The retry signal patches one field on the application, then unblocks the
+  // recoverable step that's currently waiting.
+  setHandler(retrySignal, (update: RetryUpdate) => {
+    if (update.key) {
+      const key = update.key as keyof LoanApplication;
+      const oldValue = String(app[key]);
+      if (key === 'annualIncome' || key === 'loanAmount' || key === 'downPayment') {
+        (app[key] as number) = parseFloat(update.value ?? '0');
+      } else {
+        (app[key] as string) = update.value ?? '';
+      }
+      state.fixHistory.push({
+        activity: state.failedActivity,
+        field: key,
+        oldValue,
+        newValue: update.value ?? '',
+        error: state.failureMessage,
+      });
+      log.info(`Fix received ${key}: ${oldValue} -> ${update.value}`);
     }
-  }
-};
+    retryRequested = true;
+  });
 ```
 
-**Why:** `ApplicationFailure.nonRetryable` means "don't auto-retry — a human must
-intervene." The `try/catch` + `condition` turns that into a durable pause-and-resume.
+This is the heart of the module. When the `retry` signal arrives it patches one field
+on `app` (numbers like `annualIncome` are parsed; everything else is a string), and
+`retryRequested = true` releases the paused step.
+
+The `state.fixHistory.push({...})` call is the audit trail: **before** overwriting the
+field, we capture `oldValue`, then record what changed and *why* — `state.failedActivity`
+and `state.failureMessage` tell us which step failed and with what error. (Those two are
+kept up to date by `setStatus`, which you add next.) `getState` later surfaces this
+`fixHistory` so you can see every human correction the loan needed.
+
+### 2b — The setStatus helper
+
+```ts
+  const setStatus = (status: LoanStatus, activity = '', message = '') => {
+    state.status = status;
+    state.failedActivity = activity;
+    state.failureMessage = message;
+  };
+```
+
+One place to update the status **and** remember which activity failed and why. The
+handler in 2a reads `state.failedActivity` / `state.failureMessage` when it records a
+fix — this helper is what keeps them current.
+
+### 2c — The recoverableStep helper
+
+```ts
+  const recoverableStep = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
+    while (true) {
+      try {
+        return await fn();
+      } catch (e: any) {
+        const message = e.cause?.message || e.message || String(e);
+        log.warn(`${name} failed: ${message}`);
+        setStatus('PENDING_FIX', name, message);
+        retryRequested = false;
+        await condition(() => retryRequested);
+        setStatus('STARTED');
+        log.info(`Retrying ${name}`);
+      }
+    }
+  };
+```
+
+Run the activity; if it throws, set status to `PENDING_FIX` (recording the failure),
+then **wait** with `condition(() => retryRequested)` until the handler in 2a flips the
+flag. Then loop and try again with the patched data. The loan never fails outright — a
+human just nudges it forward.
+
+**Why:** `ApplicationFailure.nonRetryable` means *"don't auto-retry — a human must
+intervene."* The `try/catch` + `condition` turns that into a durable pause-and-resume.
 
 ---
 
-## Step 3 — Wrap each forward activity
+## Step 3 — Wrap the forward pipeline
 
-Replace the three direct activity calls with `recoverableStep(...)`:
+Now make the pipeline use those helpers. Replace everything from the first
+`await verifyIncome(...)` down through `return state;` with:
 
 ```ts
-await recoverableStep('verifyIncome', () =>
-  verifyIncome(app.applicantName, app.employerName, app.annualIncome));
-await recoverableStep('runCreditCheck', () =>
-  runCreditCheck(app.applicantName, app.ssn));
-await recoverableStep('underwrite', () =>
-  underwrite(app.applicantName, app.annualIncome, app.loanAmount, app.downPayment));
+  await recoverableStep('verifyIncome', () =>
+    verifyIncome(app.applicantName, app.employerName, app.annualIncome)
+  );
+  state.completedActivities.push('verifyIncome');
+  setStatus('INCOME_VERIFIED');
+
+  await recoverableStep('runCreditCheck', () => runCreditCheck(app.applicantName, app.ssn));
+  state.completedActivities.push('runCreditCheck');
+  setStatus('CREDIT_CHECKED');
+
+  await recoverableStep('underwrite', () =>
+    underwrite(app.applicantName, app.annualIncome, app.loanAmount, app.downPayment)
+  );
+  state.completedActivities.push('underwrite');
+  setStatus('UNDERWRITTEN');
+
+  setStatus('PENDING_APPROVAL');
+  await condition(() => approved || rejected);
+
+  if (rejected) {
+    setStatus('REJECTED');
+  } else {
+    state.completedActivities.push('humanApproval');
+    setStatus('APPROVED');
+  }
+
+  return state;
 ```
+
+Each forward activity now runs inside `recoverableStep`, and the status transitions go
+through `setStatus` so a failure cleanly records *which* step paused.
 
 ---
 
