@@ -1,5 +1,9 @@
 # Workshop: Durable AI Agents with Temporal
 
+[![Temporal Agentic Loan Origination — browser-based course site](./assets/course-site.png)](https://temporal-training-agentic-loan-origination.fly.dev)
+
+▶ **[Launch the workshop in your browser →](https://temporal-training-agentic-loan-origination.fly.dev)**
+
 A 3-hour, hands-on workshop. You will build a loan-origination workflow from
 scratch, one concept at a time, and finish with a **durable AI underwriting
 agent** running as a child workflow.
@@ -58,8 +62,8 @@ temporal-training-agentic-loan-origination/
 - **Locally in four terminals** — the classic setup. See
   [How to run any module](#how-to-run-any-module). Module 4 calls OpenAI by
   default, or you can run it **fully offline** against a local qwen model — see
-  [Run it offline](#run-it-offline-on-your-machine). Each module also has its own
-  `OFFLINE_GUIDE.md`.
+  [Run it offline](#run-it-offline-on-your-machine). Each module's own
+  `README.md` has the full local walkthrough.
 
 ---
 
@@ -160,8 +164,8 @@ export AGENT_MODEL=qwen2.5:1.5b
 ```
 
 Modules 1–3 have no LLM, so they're already fully offline — no Docker needed.
-Per-module steps are in each module's **`OFFLINE_GUIDE.md`** (start with
-[module-4-ai-agent/OFFLINE_GUIDE.md](./module-4-ai-agent/OFFLINE_GUIDE.md)).
+Per-module steps are in each module's **`README.md`** (start with
+[module-4-ai-agent/README.md](./module-4-ai-agent/README.md)).
 
 > The small qwen model is CPU-bound and less reliable at tool-calling than a
 > hosted model; the agent's `ESCALATE` fallback covers the cases it can't parse.

@@ -5,7 +5,7 @@
 #   docker compose up                 # Ollama + auto-pull the qwen model
 #
 # Then point the agent at Ollama's OpenAI-compatible endpoint and run the module
-# (see module-4-ai-agent/OFFLINE_GUIDE.md):
+# (see module-4-ai-agent/README.md):
 #   export LLM_BASE_URL=http://localhost:11434/v1
 #   export LLM_API_KEY=ollama          # any non-empty value; Ollama ignores it
 #   export AGENT_MODEL=qwen2.5:1.5b
