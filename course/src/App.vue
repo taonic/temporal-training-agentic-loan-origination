@@ -57,6 +57,13 @@ function startCompletionPoll(sandboxId, workflowId) {
       if (controller.signal.aborted || data.gone) return;
       if (data.completed) {
         if (completionPoll === controller) {
+          // The run only ever put the client's "Started ..." stdout in the
+          // Output tab; the workflow's actual result (the loan decision) isn't
+          // known until it closes. Surface it here now that we have it.
+          if (data.result) {
+            state.workflowOutput = data.result;
+            state.runnerPanel = "output";
+          }
           try {
             launchConfetti();
           } catch {
