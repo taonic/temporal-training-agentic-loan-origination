@@ -136,6 +136,23 @@ async function sourceFilePaths(moduleId) {
   return out.sort();
 }
 
+// Reads the workflow id the client.ts will use for the given scenario straight
+// from its `scenarios` map, so the completion watch (and thus the confetti)
+// always polls the right id. Deriving it here — rather than duplicating the id
+// in this file — keeps it from drifting when the per-module ids change.
+async function resolveWorkflowId(moduleDir, scenario) {
+  const clientPath = path.join(moduleDir, "starter", "src", "client.ts");
+  const source = await fs.readFile(clientPath, "utf8");
+  // Match `<key>:` (e.g. `clean:` or `'bad-ssn':`) then the next applicationId.
+  const key = scenario || "clean";
+  const block = new RegExp(`['"]?${key}['"]?\\s*:\\s*\\{[^}]*?applicationId\\s*:\\s*['"]([^'"]+)['"]`);
+  const match = source.match(block);
+  if (!match) {
+    throw new Error(`Could not find applicationId for scenario "${key}" in ${clientPath}`);
+  }
+  return match[1];
+}
+
 async function resolveModule(moduleId) {
   if (!/^module-\d+/.test(moduleId ?? "")) {
     throw new Error("moduleId must be a module directory such as module-1-durable-pipeline");
@@ -153,9 +170,9 @@ async function resolveModule(moduleId) {
     worker: `npx ts-node ${moduleId}/starter/src/worker.ts`,
     starter: starterCmd,
     workerProcessPattern: `${moduleId}/starter/src/worker.ts`,
-    // The workflow id the client uses (bad-ssn scenario uses LOAN-002). The
-    // browser polls /api/await-result with this to celebrate completion.
-    workflowId: scenario === "bad-ssn" ? "LOAN-002" : "LOAN-001",
+    // The workflow id the client uses, read from client.ts. The browser polls
+    // /api/await-result with this to celebrate completion.
+    workflowId: await resolveWorkflowId(moduleDir, scenario),
     // Module 4's agent needs a local LLM; detected by its agent activities file.
     needsLlm: files.includes("agent-activities.ts"),
   };
