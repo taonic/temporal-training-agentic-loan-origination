@@ -8,6 +8,7 @@ import { indentWithTab } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
+import { linter, lintGutter } from "@codemirror/lint";
 
 import { launchConfetti } from "./confetti.js";
 import Tour from "./Tour.vue";
@@ -92,6 +93,9 @@ const state = reactive({
   runnerPanel: "console",
   logs: [],
   spinner: "",
+  // Latest server-side type-check result for the current module, shared by the
+  // editor's inline markers and the pre-run gate.
+  diagnostics: [],
   workflowOutput: "",
   workerBusy: false,
   starterBusy: false,
@@ -423,6 +427,51 @@ const editorTheme = EditorView.theme(
   { dark: true },
 );
 
+// Type checks the current module server-side (no sandbox needed) and caches the
+// result so the editor markers and the pre-run gate share one fetch.
+async function requestTypecheck() {
+  const response = await fetch("/api/typecheck", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      exerciseId: currentExercise.value.id,
+      files: allEditedFiles(),
+    }),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  state.diagnostics = data.diagnostics ?? [];
+  return state.diagnostics;
+}
+
+// CodeMirror linter: on a debounce after edits it re-checks the whole module and
+// shows the active file's diagnostics as inline squiggles (+ gutter markers via
+// lintGutter). A failed check (e.g. runner offline) silently shows nothing so it
+// never blocks editing. The server returns offsets within each file, which line
+// up with this view's document since it holds that same file's text.
+const tsLinter = linter(
+  async (view) => {
+    if (!currentFile.value) return [];
+    let all;
+    try {
+      all = await requestTypecheck();
+    } catch {
+      return [];
+    }
+    const activePath = currentFile.value.path;
+    const docLen = view.state.doc.length;
+    return all
+      .filter((d) => d.file === activePath && typeof d.start === "number")
+      .map((d) => ({
+        from: Math.min(d.start, docLen),
+        to: Math.min(d.start + (d.length ?? 0), docLen),
+        severity: d.category === "error" ? "error" : "warning",
+        message: d.message,
+      }));
+  },
+  { delay: 600 },
+);
+
 function makeEditorState(doc) {
   return EditorState.create({
     doc,
@@ -434,6 +483,8 @@ function makeEditorState(doc) {
       EditorState.tabSize.of(2),
       oneDark,
       editorTheme,
+      lintGutter(),
+      tsLinter,
       EditorView.updateListener.of((update) => {
         if (update.docChanged) editorValue.value = update.state.doc.toString();
       }),
@@ -529,21 +580,45 @@ async function streamAction(action, extraBody) {
   return ok;
 }
 
+// Before any sandbox run, block on type errors (warnings are fine). Listing them
+// in the console and skipping the launch saves a doomed sandbox round trip. If
+// the checker can't be reached we let the run proceed rather than get in the way.
+async function passesTypecheckGate() {
+  let diagnostics;
+  try {
+    diagnostics = await requestTypecheck();
+  } catch {
+    return true;
+  }
+  const errors = diagnostics.filter((d) => d.category === "error");
+  if (errors.length === 0) return true;
+  state.runnerPanel = "console";
+  state.logs = [
+    `Type check found ${errors.length} error${errors.length === 1 ? "" : "s"} — fix these before running:`,
+    ...errors.map((d) => `  ${d.file ?? "?"}:${d.line ?? "?"}:${d.col ?? "?"} — ${d.message}`),
+  ];
+  showToast(`${errors.length} type error${errors.length === 1 ? "" : "s"}`);
+  return false;
+}
+
 // Combined Run (dock): (re)start the worker and submit a loan application together.
 async function runInSandbox() {
   if (!canRunSandbox.value) return;
+  if (!(await passesTypecheckGate())) return;
   if (await streamAction("all", {})) state.workerActive = true;
 }
 
-// worker.ts tab: start (or restart) the long-running worker. Always allowed - a
-// fresh click just cancels and restarts the in-flight worker run.
+// worker.ts tab: start (or restart) the long-running worker. A fresh click
+// cancels and restarts the in-flight worker run (once it clears the type gate).
 async function runWorker() {
+  if (!(await passesTypecheckGate())) return;
   if (await streamAction("worker", { action: "worker" })) state.workerActive = true;
 }
 
 // client.ts tab: submit a loan application once against the running worker.
-// Always allowed - re-running cancels and restarts any in-flight starter run.
+// Re-running cancels and restarts any in-flight starter run.
 async function runStarter() {
+  if (!(await passesTypecheckGate())) return;
   await streamAction("starter", { action: "starter" });
 }
 
