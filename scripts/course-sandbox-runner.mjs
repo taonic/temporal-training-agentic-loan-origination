@@ -967,13 +967,30 @@ border-top-color:#818cf8;animation:__cspin .8s linear infinite}
 @media(prefers-reduced-motion:reduce){#__course_loading .__s{animation-duration:2s}}
 </style>
 <div id="__course_loading"><div class="__s"></div><div>Loading the workflow…</div></div>
-<script>(function(){var el=document.getElementById('__course_loading');if(!el)return;
-function done(){el.style.opacity='0';setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},250);}
+<script>(function(){var el=document.getElementById('__course_loading');
+function done(){if(!el)return;var node=el;el=null;node.style.pointerEvents='none';node.style.opacity='0';setTimeout(function(){if(node.parentNode)node.parentNode.removeChild(node);},250);}
 function ready(){return!!document.querySelector('main,nav,header,[data-testid]')||document.body.querySelectorAll('*').length>40;}
-var obs=new MutationObserver(function(){if(ready()){obs.disconnect();done();}});
+function reply(m){try{parent.postMessage(m,'*');}catch(e){}}
+var announced=false;function announce(){if(announced)return;announced=true;reply({__course:'ready'});}
+if(el){var obs=new MutationObserver(function(){if(ready()){obs.disconnect();done();announce();}});
 try{obs.observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
-setTimeout(function(){if(ready()){obs.disconnect();done();}},400);
-setTimeout(function(){try{obs.disconnect();}catch(e){}done();},15000);})();</script>`;
+setTimeout(function(){if(ready()){obs.disconnect();done();announce();}},400);
+setTimeout(function(){try{obs.disconnect();}catch(e){}done();announce();},15000);}else{announce();}
+// Client-side navigation requested by the embedding page: a constructed MouseEvent
+// click on an in-app link makes SvelteKit's router navigate without a full document
+// reload (a bare .click() fails its which===1 check, causing a hard navigation). We
+// confirm via the pathname and report navok/navfail so the parent can hard-load as a
+// last resort.
+window.addEventListener('message',function(e){var d=e.data;if(!d||d.__course!=='nav'||!d.path)return;
+try{var root=document.getElementById('svelte')||document.body;var a=document.createElement('a');a.href=d.path;root.appendChild(a);
+// dispatchEvent returns false when a listener calls preventDefault — i.e. SvelteKit's
+// router intercepted the click and is navigating client-side (no reload). If it isn't
+// prevented the click would do a hard navigation, so report navfail and let the parent
+// hard-load instead.
+var prevented=!a.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window,button:0}));
+setTimeout(function(){if(a.parentNode)a.remove();},0);
+reply({__course:prevented?'navok':'navfail',path:d.path});
+}catch(err){reply({__course:'navfail',path:d.path});}});})();</script>`;
 
 // Drops the loader overlay markup in right after the opening <body> tag so it paints
 // before anything else; falls back to prepending if no <body> is found. Also strips

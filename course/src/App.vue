@@ -90,6 +90,9 @@ const state = reactive({
   sandboxId: localStorage.getItem(`${storagePrefix}:sandbox-id`) ?? "",
   temporalUiUrl: localStorage.getItem(`${storagePrefix}:temporal-ui-url`) ?? "",
   workflowId: "",
+  // Bumped on every finished run so the pane reloads to the latest execution even
+  // when the workflow id is unchanged between runs (see paneSrc).
+  runSeq: 0,
   // Right-hand drawer that embeds this workflow in the sandbox's Temporal Web UI.
   // Opens automatically once a run reports its workflow id (see handleRunnerEvent).
   workflowPaneOpen: false,
@@ -259,19 +262,59 @@ const proxyOrigin = computed(() => {
 
 // The pane keeps ONE iframe alive for the whole sandbox session. It mounts as soon as
 // a sandbox exists — off-screen while the pane is still closed — and loads the UI
-// root, which warms what matters before the pane ever opens: the browser's bundle
-// cache, the proxy's asset cache, the keep-alive connection, and the auth-cookie
-// handshake. When the workflow id arrives the src switches to that workflow's page;
-// because the bundle is already cached + brotli'd and the connection is warm, that
-// load is a "warm reload" rather than a cold one, and later open/close toggles don't
-// reload at all (the iframe stays mounted).
-const paneSrc = computed(() => {
-  if (!proxyOrigin.value || !state.sandboxId) return "";
-  const pin = `__s=${encodeURIComponent(state.sandboxId)}`;
+// root, which warms everything before the pane opens: the browser bundle cache, the
+// proxy asset cache, the keep-alive connection, and the auth-cookie handshake. The
+// src then stays put; we move to the workflow page (and refresh on later runs) with a
+// client-side navigation so the booted SPA is never reloaded. The src only changes for
+// a new sandbox, or as a hard-load fallback if a client navigation can't be confirmed.
+const paneIframe = ref(null);
+const paneSrc = ref("");
+let paneIframeSandbox = "";
+// Set once the embedded SPA has announced it's rendered (so a nav click hits its
+// router, not a cold document).
+let paneReady = false;
+let paneNavFallbackTimer = null;
+
+// The path we want the embedded UI to show. `t` (the run counter) makes each run's
+// target a fresh URL so re-running the same workflow id still refreshes the page —
+// without a reload. The proxy/SPA ignore the extra param.
+function desiredNavPath() {
   return state.workflowId
-    ? `${proxyOrigin.value}/namespaces/default/workflows/${encodeURIComponent(state.workflowId)}?${pin}`
-    : `${proxyOrigin.value}/?${pin}`;
-});
+    ? `/namespaces/default/workflows/${encodeURIComponent(state.workflowId)}?t=${state.runSeq}`
+    : "";
+}
+
+function hardLoadWorkflow() {
+  if (!proxyOrigin.value || !state.sandboxId || !state.workflowId) return;
+  paneSrc.value = `${proxyOrigin.value}/namespaces/default/workflows/${encodeURIComponent(state.workflowId)}?__s=${encodeURIComponent(state.sandboxId)}`;
+}
+
+// Ask the embedded SPA to client-navigate to the current workflow. Retries are driven
+// by the events that call this (ready/run/open); a fallback hard-load covers the rare
+// case where the navigation can't be confirmed.
+function requestPaneNav() {
+  const path = desiredNavPath();
+  if (!path || !paneReady) return;
+  const win = paneIframe.value?.contentWindow;
+  if (!win || !proxyOrigin.value) return;
+  win.postMessage({ __course: "nav", path }, proxyOrigin.value);
+  clearTimeout(paneNavFallbackTimer);
+  paneNavFallbackTimer = setTimeout(hardLoadWorkflow, 3000);
+}
+
+function onProxyMessage(event) {
+  if (!proxyOrigin.value || event.origin !== proxyOrigin.value) return;
+  const data = event.data;
+  if (!data || typeof data !== "object") return;
+  if (data.__course === "ready") {
+    paneReady = true;
+    requestPaneNav();
+  } else if (data.__course === "navok") {
+    clearTimeout(paneNavFallbackTimer);
+  } else if (data.__course === "navfail") {
+    hardLoadWorkflow();
+  }
+}
 
 function onPaneFrameLoad() {
   state.paneFrameLoaded = true;
@@ -782,10 +825,12 @@ function handleRunnerEvent({ kind, payload }) {
   } else if (kind === "result") {
     captureProxyConfig(payload);
     // The workflow id powers the completion watch (see startCompletionPoll) and
-    // the Temporal UI deep link. Slide the pane out so the learner watches the
-    // run they just started.
+    // the Temporal UI deep link. Slide the pane out and always switch it to this
+    // run's workflow — bumping runSeq forces a reload even when the id is unchanged,
+    // so the pane shows the most recently finished execution.
     if (payload.workflowId) {
       state.workflowId = payload.workflowId;
+      state.runSeq += 1;
       if (state.temporalUiUrl) state.workflowPaneOpen = true;
     }
     // A worker-only run has no workflowResult; leave the output pane untouched.
@@ -837,11 +882,39 @@ watch(editorValue, (value) => {
   setEditorDoc(value);
 });
 
-// A changed src means a real (re)load (new sandbox, or root → workflow), so re-arm
-// the spinner until it paints. Toggling the pane open/closed keeps the same src, so
-// it doesn't reload.
+// (Re)build the iframe src only when the sandbox changes — it loads the UI root and
+// boots the SPA once. Workflow navigation happens client-side via requestPaneNav, so
+// new runs don't reload the iframe.
+watch(
+  [proxyOrigin, () => state.sandboxId],
+  () => {
+    const origin = proxyOrigin.value;
+    const sid = state.sandboxId;
+    if (!origin || !sid) {
+      paneSrc.value = "";
+      paneIframeSandbox = "";
+      paneReady = false;
+      return;
+    }
+    if (sid !== paneIframeSandbox) {
+      paneIframeSandbox = sid;
+      paneReady = false;
+      paneSrc.value = `${origin}/?__s=${encodeURIComponent(sid)}`;
+    }
+  },
+  { immediate: true },
+);
+
+// A changed src means a real (re)load (new sandbox, or the hard-load fallback), so
+// re-arm the spinner until it paints.
 watch(paneSrc, () => {
   state.paneFrameLoaded = false;
+});
+
+// After each run (runSeq), and whenever the pane opens, ask the embedded UI to
+// navigate to the current workflow — client-side, no reload.
+watch([() => state.runSeq, () => state.workflowPaneOpen], () => {
+  if (state.workflowId) nextTick(requestPaneNav);
 });
 
 // Keep the freshest console output in view as logs/spinner stream in (and when
@@ -880,6 +953,7 @@ onMounted(() => {
   });
   // Exposed for quick manual testing in the DevTools console: launchConfetti().
   window.launchConfetti = launchConfetti;
+  window.addEventListener("message", onProxyMessage);
   checkSandbox();
   updateHash();
   window.addEventListener("hashchange", () => {
@@ -897,6 +971,8 @@ onBeforeUnmount(() => {
   editorView?.destroy();
   Object.values(runControllers).forEach((controller) => controller?.abort());
   window.clearTimeout(toastTimer);
+  window.clearTimeout(paneNavFallbackTimer);
+  window.removeEventListener("message", onProxyMessage);
 });
 </script>
 
@@ -1084,6 +1160,7 @@ onBeforeUnmount(() => {
         <div class="workflow-pane-body">
           <iframe
             v-if="paneSrc"
+            ref="paneIframe"
             :src="paneSrc"
             class="workflow-pane-frame"
             title="Temporal Web UI"

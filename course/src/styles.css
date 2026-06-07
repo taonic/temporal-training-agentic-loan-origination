@@ -820,10 +820,13 @@ h2 {
    open it joins the grid (see .course-shell.pane-open), pushing the editor and
    instruction columns in to make room rather than overlaying them. */
 .course-shell.pane-open {
+  /* Same editor width (--code-col, driven by the editor/instructions resizer) as the
+     two-pane layout, but cap it so the instructions keep room beside the pane — this
+     is what lets that resizer keep working while the pane is open. */
   grid-template-columns:
-    minmax(300px, 1.4fr)
+    clamp(320px, var(--code-col, 57%), calc(100% - 300px - var(--pane-width, clamp(360px, 34vw, 760px))))
     10px
-    minmax(260px, 1fr)
+    minmax(240px, 1fr)
     10px
     var(--pane-width, clamp(360px, 34vw, 760px));
 }
@@ -904,6 +907,8 @@ h2 {
   color: var(--code-ink);
   font-size: 13px;
   opacity: 0.85;
+  /* Purely decorative — never intercept clicks meant for the embedded UI. */
+  pointer-events: none;
 }
 
 .workflow-pane-spinner {
