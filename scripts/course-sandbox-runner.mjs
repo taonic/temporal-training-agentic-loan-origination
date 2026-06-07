@@ -1,8 +1,10 @@
 import fs from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
+import zlib from "node:zlib";
 
 import crypto from "node:crypto";
 
@@ -25,6 +27,22 @@ const distDir = process.env.COURSE_DIST_DIR
 const appDir = "/opt/app";
 const temporalBin = "/usr/local/bin/temporal";
 const temporalUiPort = 8233;
+
+// The browser embeds each sandbox's Temporal Web UI in a slide-out pane. The
+// sandbox's signed daytonaproxy URL can't be iframed directly (it answers with
+// X-Frame-Options: SAMEORIGIN, and its auth cookies are scoped to that domain so
+// they're blocked as third-party in a cross-site frame). So we run a small
+// same-origin reverse proxy that forwards to the sandbox UI, strips the framing
+// headers, and re-scopes cookies to the proxy's own host. It listens on its own
+// port (default PORT+1); set UI_PROXY_PORT to override. When the proxy is exposed
+// behind a public hostname that differs from the page's host:port, set
+// UI_PROXY_PUBLIC_BASE (e.g. https://tui.example.com) so the browser targets it
+// directly; otherwise the page derives it from its own hostname + this port.
+const uiProxyPort = Number(process.env.UI_PROXY_PORT ?? port + 1);
+const uiProxyPublicBase = process.env.UI_PROXY_PUBLIC_BASE?.replace(/\/$/, "") || null;
+// Pins a browser to its sandbox so the Temporal UI's root-absolute asset/API
+// requests (which carry no sandbox hint) reach the right upstream.
+const uiProxyCookie = "tui_sandbox";
 
 // The Module 4 agent calls OpenAI through a shared LiteLLM proxy on Fly that
 // holds the real OpenAI key. We inject the proxy's URL + shared key into each
@@ -414,6 +432,16 @@ class CourseSandboxManager {
     // Refetch a little before the signature actually lapses.
     this.previewUrls.set(sandbox.id, { url: preview.url, expiresAt: Date.now() + 3000 * 1000 });
     return preview.url;
+  }
+
+  // Resolves the Temporal UI base URL for a sandbox id, used by the UI proxy.
+  // Serves the cached signed URL when fresh; otherwise re-resolves the sandbox
+  // (which a long-lived proxy connection may outlive) and fetches a new one.
+  async previewBaseFor(sandboxId) {
+    const cached = this.previewUrls.get(sandboxId);
+    if (cached && cached.expiresAt > Date.now()) return cached.url;
+    const sandbox = await this.daytona.get(sandboxId);
+    return this.getPreviewUrl(sandbox);
   }
 
   // Dispatches a run request. `action` selects which parts run:
@@ -842,6 +870,273 @@ function getManager() {
   return manager;
 }
 
+// What the browser needs to reach the UI proxy: an explicit public base when set,
+// otherwise the port to combine with the page's own hostname.
+function uiProxyInfo() {
+  return { uiProxyBase: uiProxyPublicBase, uiProxyPort: uiProxyPublicBase ? null : uiProxyPort };
+}
+
+function parseCookies(header) {
+  const out = {};
+  if (!header) return out;
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    out[part.slice(0, eq).trim()] = part.slice(eq + 1).trim();
+  }
+  return out;
+}
+
+// Headers we never forward upstream: hop-by-hop or recomputed by fetch/undici.
+const proxyDropRequestHeaders = new Set(["host", "connection", "content-length", "accept-encoding"]);
+// Response headers we drop or special-case before relaying to the browser. We set
+// content-encoding/length ourselves, so the upstream's (the body fetch already
+// decoded) are dropped here.
+const proxyDropResponseHeaders = new Set([
+  "x-frame-options",
+  "content-security-policy",
+  "content-security-policy-report-only",
+  "content-encoding",
+  "content-length",
+  "transfer-encoding",
+  "set-cookie",
+  "location",
+]);
+
+// Text-ish bodies worth gzipping on the browser-facing hop. The sandbox dev server
+// serves the Temporal UI uncompressed, and fetch() decodes anything it does encode,
+// so without this we'd ship multi-MB of JS in the clear over a cross-region link.
+const proxyCompressible = /^(?:text\/|application\/(?:javascript|json|manifest\+json|xml|wasm)|image\/svg\+xml)/i;
+function clientAcceptsGzip(req) {
+  return /\bgzip\b/i.test(req.headers["accept-encoding"] || "");
+}
+function clientAcceptsBr(req) {
+  return /\bbr\b/i.test(req.headers["accept-encoding"] || "");
+}
+// Brotli beats gzip ~15% on JS; quality 10 keeps the one-off compress fast while
+// staying close to max ratio. Cheap overall since asset results are cached.
+const brotliOpts = (size) => ({
+  params: {
+    [zlib.constants.BROTLI_PARAM_QUALITY]: 10,
+    [zlib.constants.BROTLI_PARAM_SIZE_HINT]: size || 0,
+  },
+});
+// Picks the best encoding the client accepts and returns the matching bytes,
+// memoizing the compressed copies on the entry so repeat hits skip the work.
+function encodeBody(req, entry) {
+  if (entry.compressible !== false) {
+    if (clientAcceptsBr(req)) {
+      entry.br ??= zlib.brotliCompressSync(entry.body, brotliOpts(entry.body.length));
+      return { encoding: "br", buf: entry.br };
+    }
+    if (clientAcceptsGzip(req)) {
+      entry.gzip ??= zlib.gzipSync(entry.body);
+      return { encoding: "gzip", buf: entry.gzip };
+    }
+  }
+  return { encoding: null, buf: entry.body };
+}
+
+// In-process cache for the Temporal UI's content-hashed assets. They're immutable
+// and identical across sandboxes (same Temporal version), so keying by path alone
+// lets later loads — and other students — skip both the Daytona round trip and the
+// gzip work. Bounded with simple FIFO eviction.
+const uiAssetCache = new Map();
+const uiAssetCacheMax = 1024;
+function isImmutableAsset(pathname) {
+  return pathname.startsWith("/_app/immutable/");
+}
+function cacheAsset(pathname, entry) {
+  if (uiAssetCache.size >= uiAssetCacheMax) uiAssetCache.delete(uiAssetCache.keys().next().value);
+  uiAssetCache.set(pathname, entry);
+}
+
+// Injected into every proxied Temporal UI HTML document. The iframe's `load` event
+// fires when the document arrives, but the SvelteKit SPA then boots and renders for
+// a beat longer — and the embedding page is a different origin, so it can't see when
+// that finishes. So we put the loading overlay *inside* the page: it paints with the
+// HTML and removes itself once real UI content appears (or after a safety timeout),
+// covering the otherwise-white SPA boot.
+const uiLoaderInjection = `<style>
+#__course_loading{position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;
+align-items:center;justify-content:center;gap:14px;background:#1d1d20;color:#e7ebf2;
+font:600 13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;transition:opacity .25s ease}
+#__course_loading .__s{width:30px;height:30px;border-radius:50%;border:3px solid rgba(231,235,242,.25);
+border-top-color:#818cf8;animation:__cspin .8s linear infinite}
+@keyframes __cspin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#__course_loading .__s{animation-duration:2s}}
+</style>
+<div id="__course_loading"><div class="__s"></div><div>Loading the workflow…</div></div>
+<script>(function(){var el=document.getElementById('__course_loading');if(!el)return;
+function done(){el.style.opacity='0';setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},250);}
+function ready(){return!!document.querySelector('main,nav,header,[data-testid]')||document.body.querySelectorAll('*').length>40;}
+var obs=new MutationObserver(function(){if(ready()){obs.disconnect();done();}});
+try{obs.observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
+setTimeout(function(){if(ready()){obs.disconnect();done();}},400);
+setTimeout(function(){try{obs.disconnect();}catch(e){}done();},15000);})();</script>`;
+
+// Drops the loader overlay markup in right after the opening <body> tag so it paints
+// before anything else; falls back to prepending if no <body> is found. Also strips
+// the Temporal UI's CSP <meta> (we already strip the CSP header): its script-src
+// 'strict-dynamic' would otherwise block the injected loader-removal script.
+function injectUiLoader(html) {
+  const stripped = html.replace(
+    /<meta[^>]*http-equiv=["']?content-security-policy["']?[^>]*>/gi,
+    "",
+  );
+  const match = stripped.match(/<body[^>]*>/i);
+  return match ? stripped.replace(match[0], match[0] + uiLoaderInjection) : uiLoaderInjection + stripped;
+}
+
+// Sends a cached/just-fetched immutable asset in the best encoding the client
+// accepts (brotli > gzip > identity), memoized on the entry.
+function sendCachedAsset(req, res, entry) {
+  const headers = {
+    "content-type": entry.contentType,
+    "cache-control": "public, max-age=31536000, immutable",
+    vary: "Accept-Encoding",
+  };
+  const { encoding, buf } = encodeBody(req, entry);
+  if (encoding) headers["content-encoding"] = encoding;
+  headers["content-length"] = buf.length;
+  res.writeHead(entry.status, headers);
+  res.end(req.method === "HEAD" ? undefined : buf);
+}
+
+// Same-origin reverse proxy for the sandbox's Temporal Web UI (see uiProxyPort
+// notes above). It mirrors every request to the pinned sandbox's signed UI URL,
+// drops the framing headers so the page can live in an iframe, and re-scopes the
+// upstream's auth cookies to this host so they survive in the embedded context.
+const uiProxyServer = http.createServer(async (req, res) => {
+  try {
+    const reqUrl = new URL(req.url ?? "/", `http://${host}:${uiProxyPort}`);
+    const cookies = parseCookies(req.headers.cookie);
+    // The pane points the iframe at `…?__s=<sandboxId>`; we pin that to a cookie so
+    // the UI's later root-absolute requests (which drop the query) still resolve.
+    const pin = reqUrl.searchParams.get("__s");
+    const sandboxId = pin || cookies[uiProxyCookie];
+    if (pin) reqUrl.searchParams.delete("__s");
+    if (!sandboxId) {
+      res.writeHead(400, { "content-type": "text/plain" });
+      res.end("No sandbox selected. Open the Temporal UI from the course pane.");
+      return;
+    }
+
+    // Immutable assets are version-keyed, so a cache hit skips the sandbox entirely.
+    const cacheable = (req.method === "GET" || req.method === "HEAD") && isImmutableAsset(reqUrl.pathname);
+    if (cacheable) {
+      const hit = uiAssetCache.get(reqUrl.pathname);
+      if (hit) {
+        sendCachedAsset(req, res, hit);
+        return;
+      }
+    }
+
+    let base;
+    try {
+      base = (await getManager().previewBaseFor(sandboxId)).replace(/\/$/, "");
+    } catch (err) {
+      res.writeHead(502, { "content-type": "text/plain" });
+      res.end(`Sandbox unavailable: ${err.message}`);
+      return;
+    }
+
+    const fwdHeaders = {};
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (proxyDropRequestHeaders.has(key.toLowerCase())) continue;
+      fwdHeaders[key] = value;
+    }
+    // Strip our own pin cookie so only the upstream's cookies reach upstream.
+    if (req.headers.cookie) {
+      const upstreamCookie = req.headers.cookie
+        .split(";")
+        .map((c) => c.trim())
+        .filter((c) => c && !c.startsWith(`${uiProxyCookie}=`))
+        .join("; ");
+      if (upstreamCookie) fwdHeaders.cookie = upstreamCookie;
+      else delete fwdHeaders.cookie;
+    }
+
+    let body;
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      body = Buffer.concat(chunks);
+    }
+
+    const upstream = await fetch(`${base}${reqUrl.pathname}${reqUrl.search}`, {
+      method: req.method,
+      headers: fwdHeaders,
+      body,
+      redirect: "manual",
+    });
+
+    const outHeaders = {};
+    upstream.headers.forEach((value, key) => {
+      if (!proxyDropResponseHeaders.has(key.toLowerCase())) outHeaders[key] = value;
+    });
+    // Keep redirects on the proxy origin by relativizing upstream Location values.
+    const location = upstream.headers.get("location");
+    if (location) outHeaders.location = location.startsWith(base) ? location.slice(base.length) || "/" : location;
+
+    // Re-scope upstream cookies to this host (drop Domain so they're host-only,
+    // and Secure so they survive plain-http local dev), and (re)set the pin.
+    const setCookies = (upstream.headers.getSetCookie?.() ?? []).map((cookie) =>
+      cookie.replace(/;\s*Domain=[^;]*/i, "").replace(/;\s*Secure/i, ""),
+    );
+    if (pin) setCookies.push(`${uiProxyCookie}=${sandboxId}; Path=/; SameSite=Lax`);
+    if (setCookies.length) outHeaders["set-cookie"] = setCookies;
+
+    const contentType = upstream.headers.get("content-type") || "";
+    const compressible = upstream.status === 200 && proxyCompressible.test(contentType);
+
+    // Cache immutable assets (compressing once, lazily per encoding) so reloads and
+    // other students skip the round trip; buffer the body to do so.
+    if (cacheable && upstream.status === 200) {
+      const entry = { status: 200, contentType, body: Buffer.from(await upstream.arrayBuffer()), compressible };
+      cacheAsset(reqUrl.pathname, entry);
+      sendCachedAsset(req, res, entry);
+      return;
+    }
+
+    // Inject the in-page loader into HTML documents so the overlay survives the SPA
+    // boot. Buffer it (HTML is small) so we can rewrite then compress.
+    if (/\btext\/html\b/i.test(contentType) && upstream.status === 200) {
+      const html = Buffer.from(injectUiLoader(Buffer.from(await upstream.arrayBuffer()).toString("utf8")), "utf8");
+      const { encoding, buf } = encodeBody(req, { body: html, compressible: true });
+      if (encoding) outHeaders["content-encoding"] = encoding;
+      outHeaders.vary = "Accept-Encoding";
+      outHeaders["content-length"] = buf.length;
+      res.writeHead(upstream.status, outHeaders);
+      res.end(req.method === "HEAD" ? undefined : buf);
+      return;
+    }
+
+    if (!upstream.body) {
+      res.writeHead(upstream.status, outHeaders);
+      res.end();
+      return;
+    }
+
+    // Stream everything else, gzipping compressible bodies on the fly. (Streamed
+    // responses — mostly the dynamic data API — favor gzip's lower per-call cost
+    // over brotli; the heavy, cacheable assets above get brotli.)
+    const source = Readable.fromWeb(upstream.body);
+    if (compressible && clientAcceptsGzip(req)) {
+      outHeaders["content-encoding"] = "gzip";
+      outHeaders.vary = "Accept-Encoding";
+      res.writeHead(upstream.status, outHeaders);
+      source.pipe(zlib.createGzip()).pipe(res);
+    } else {
+      res.writeHead(upstream.status, outHeaders);
+      source.pipe(res);
+    }
+  } catch (err) {
+    if (!res.headersSent) res.writeHead(502, { "content-type": "text/plain" });
+    res.end(`UI proxy error: ${err.message}`);
+  }
+});
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${host}:${port}`);
   try {
@@ -849,6 +1144,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, {
         ok: true,
         daytona: Boolean(process.env.DAYTONA_KEY),
+        ...uiProxyInfo(),
       });
       return;
     }
@@ -871,8 +1167,10 @@ const server = http.createServer(async (req, res) => {
         log: (message) => writeSse(res, "log", message),
         spinner: (message) => writeSse(res, "spinner", message),
       };
-      const result = await getManager().run(body, events, (ui) => writeSse(res, "ui", ui));
-      writeSse(res, "result", result);
+      const result = await getManager().run(body, events, (ui) =>
+        writeSse(res, "ui", { ...ui, ...uiProxyInfo() }),
+      );
+      writeSse(res, "result", { ...result, ...uiProxyInfo() });
       writeSse(res, "done", null);
       res.end();
       return;
@@ -923,4 +1221,8 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port, host, () => {
   console.log(`Course runner listening on http://${host}:${port}`);
+});
+
+uiProxyServer.listen(uiProxyPort, host, () => {
+  console.log(`Temporal UI proxy listening on http://${host}:${uiProxyPort}`);
 });

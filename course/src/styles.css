@@ -816,13 +816,145 @@ h2 {
   transform: translateX(-50%) translateY(0);
 }
 
+/* Third workspace column that embeds the running workflow's Temporal Web UI. When
+   open it joins the grid (see .course-shell.pane-open), pushing the editor and
+   instruction columns in to make room rather than overlaying them. */
+.course-shell.pane-open {
+  grid-template-columns:
+    minmax(300px, 1.4fr)
+    10px
+    minmax(260px, 1fr)
+    10px
+    var(--pane-width, clamp(360px, 34vw, 760px));
+}
+
+.workflow-pane {
+  min-width: 0;
+}
+
+.workflow-pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.workflow-pane-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.workflow-pane-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--off-white);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workflow-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.workflow-pane-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--code-panel);
+}
+
+.workflow-pane-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.workflow-pane-empty {
+  margin: 0;
+  padding: 24px;
+  color: var(--code-ink);
+  opacity: 0.7;
+  font-size: 13px;
+}
+
+/* Spinner overlaid on the iframe until its load event fires, so the brief blank
+   gap reads as "loading" rather than "broken". */
+.workflow-pane-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--code-panel);
+  color: var(--code-ink);
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.workflow-pane-spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--code-ink) 25%, transparent);
+  border-top-color: var(--temporal-uv);
+  animation: workflow-pane-spin 0.8s linear infinite;
+}
+
+@keyframes workflow-pane-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workflow-pane-spinner {
+    animation-duration: 2s;
+  }
+}
+
+/* When the pane is closed the section stays mounted (so its iframe keeps the SPA
+   warm) but parks off-screen at a real size — position:fixed also takes it out of the
+   grid so the two-column layout is unaffected. */
+.workflow-pane--collapsed {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  width: 960px;
+  height: 720px;
+  z-index: -1;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+/* During a panel drag, stop the workflow iframe from swallowing the pointer (which
+   would otherwise capture the move events and stall the resize). */
+body.is-resizing iframe {
+  pointer-events: none;
+}
+
 @media (max-width: 1100px) {
   .topbar {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .course-shell {
+  .course-shell,
+  .course-shell.pane-open {
     grid-template-columns: 1fr;
     gap: 16px;
   }

@@ -90,6 +90,17 @@ const state = reactive({
   sandboxId: localStorage.getItem(`${storagePrefix}:sandbox-id`) ?? "",
   temporalUiUrl: localStorage.getItem(`${storagePrefix}:temporal-ui-url`) ?? "",
   workflowId: "",
+  // Right-hand drawer that embeds this workflow in the sandbox's Temporal Web UI.
+  // Opens automatically once a run reports its workflow id (see handleRunnerEvent).
+  workflowPaneOpen: false,
+  // Tracks the pane iframe's load so we can cover the blank gap with a spinner until
+  // the Temporal UI paints.
+  paneFrameLoaded: false,
+  paneWidth: localStorage.getItem(`${storagePrefix}:pane-width`) ?? "",
+  // Where the runner's same-origin Temporal UI proxy lives. The runner reports an
+  // explicit base, or a port we combine with this page's hostname (see embedUrl).
+  uiProxyBase: "",
+  uiProxyPort: 0,
   runnerPanel: "console",
   logs: [],
   spinner: "",
@@ -217,6 +228,61 @@ const workerStatusLabel = computed(() => {
   return state.workerActive ? "Worker running" : "Worker stopped";
 });
 const generatedAt = computed(() => `Course data ${new Date(course.generatedAt).toLocaleString()}`);
+
+// The deep link to this run's workflow in the sandbox's Temporal Web UI. Mirrors
+// the client's "Watch it at …" logic: keep the signed preview URL's host and query
+// (the Daytona signature) and just swap in the workflow's path. Falls back to the
+// UI root (the workflow list) before a run has reported its id.
+const workflowWatchUrl = computed(() => {
+  if (!state.temporalUiUrl) return "";
+  try {
+    const url = new URL(state.temporalUiUrl);
+    if (state.workflowId) {
+      url.pathname = `/namespaces/default/workflows/${state.workflowId}`;
+    }
+    return url.toString();
+  } catch {
+    return "";
+  }
+});
+
+// Origin of the runner's same-origin Temporal UI proxy. Prefer an explicit base
+// (set when the proxy sits behind its own public hostname); otherwise pair the
+// reported port with this page's hostname.
+const proxyOrigin = computed(() => {
+  if (state.uiProxyBase) return state.uiProxyBase.replace(/\/$/, "");
+  if (state.uiProxyPort && typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:${state.uiProxyPort}`;
+  }
+  return "";
+});
+
+// The pane keeps ONE iframe alive for the whole sandbox session. It mounts as soon as
+// a sandbox exists — off-screen while the pane is still closed — and loads the UI
+// root, which warms what matters before the pane ever opens: the browser's bundle
+// cache, the proxy's asset cache, the keep-alive connection, and the auth-cookie
+// handshake. When the workflow id arrives the src switches to that workflow's page;
+// because the bundle is already cached + brotli'd and the connection is warm, that
+// load is a "warm reload" rather than a cold one, and later open/close toggles don't
+// reload at all (the iframe stays mounted).
+const paneSrc = computed(() => {
+  if (!proxyOrigin.value || !state.sandboxId) return "";
+  const pin = `__s=${encodeURIComponent(state.sandboxId)}`;
+  return state.workflowId
+    ? `${proxyOrigin.value}/namespaces/default/workflows/${encodeURIComponent(state.workflowId)}?${pin}`
+    : `${proxyOrigin.value}/?${pin}`;
+});
+
+function onPaneFrameLoad() {
+  state.paneFrameLoaded = true;
+}
+
+// Records the proxy coordinates the runner reports on /api/health and each run.
+function captureProxyConfig(data) {
+  if (!data) return;
+  if (data.uiProxyBase !== undefined) state.uiProxyBase = data.uiProxyBase || "";
+  if (data.uiProxyPort !== undefined) state.uiProxyPort = data.uiProxyPort || 0;
+}
 
 // Shortens a module title for the picker: "Module 1 · A durable pipeline (40 min)"
 // becomes "A durable pipeline".
@@ -365,12 +431,17 @@ function startDrag(event, onMove, persist) {
   const previousCursor = document.body.style.cursor;
   document.body.style.userSelect = "none";
   document.body.style.cursor = event.currentTarget.dataset.cursor ?? "default";
+  // While dragging, a pointer that crosses the workflow iframe would otherwise be
+  // captured by it and the drag would stall. This class disables iframe pointer
+  // events for the duration so the move events keep reaching the window.
+  document.body.classList.add("is-resizing");
   const handleMove = (e) => onMove(e);
   const handleUp = () => {
     window.removeEventListener("pointermove", handleMove);
     window.removeEventListener("pointerup", handleUp);
     document.body.style.userSelect = "";
     document.body.style.cursor = previousCursor;
+    document.body.classList.remove("is-resizing");
     persist();
   };
   window.addEventListener("pointermove", handleMove);
@@ -406,6 +477,34 @@ function startDockResize(event) {
       state.dockHeight = `${Math.round(Math.min(640, Math.max(120, next)))}px`;
     },
     () => localStorage.setItem(`${storagePrefix}:dock-height`, state.dockHeight),
+  );
+}
+
+// --- Workflow pane ---------------------------------------------------------
+function toggleWorkflowPane() {
+  state.workflowPaneOpen = !state.workflowPaneOpen;
+}
+
+function closeWorkflowPane() {
+  state.workflowPaneOpen = false;
+}
+
+// Drag the resizer between the instructions and the workflow pane. The pane is the
+// last grid column, so its width is the distance from the pointer to the shell's
+// right content edge; clamp it so the editor and instructions keep usable room.
+function startWorkflowPaneResize(event) {
+  const shell = event.currentTarget.parentElement;
+  startDrag(
+    event,
+    (e) => {
+      const styles = getComputedStyle(shell);
+      const padRight = parseFloat(styles.paddingRight) || 0;
+      const rightEdge = shell.getBoundingClientRect().right - padRight;
+      const next = rightEdge - e.clientX;
+      const max = shell.getBoundingClientRect().width - 560;
+      state.paneWidth = `${Math.round(Math.min(Math.max(360, max), Math.max(320, next)))}px`;
+    },
+    () => localStorage.setItem(`${storagePrefix}:pane-width`, state.paneWidth),
   );
 }
 
@@ -503,6 +602,7 @@ async function checkSandbox() {
     const response = await fetch("/api/health");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
+    captureProxyConfig(data);
     state.sandboxAvailable = Boolean(data.daytona);
     state.sandboxStatus = data.daytona ? "ready" : "unavailable";
     state.sandboxMessage = data.daytona
@@ -676,11 +776,18 @@ function handleRunnerEvent({ kind, payload }) {
   else if (kind === "ui") {
     state.sandboxId = payload.sandboxId;
     state.temporalUiUrl = payload.uiUrl;
+    captureProxyConfig(payload);
     localStorage.setItem(`${storagePrefix}:sandbox-id`, payload.sandboxId);
     localStorage.setItem(`${storagePrefix}:temporal-ui-url`, payload.uiUrl);
   } else if (kind === "result") {
-    // The workflow id powers the completion watch (see startCompletionPoll).
-    if (payload.workflowId) state.workflowId = payload.workflowId;
+    captureProxyConfig(payload);
+    // The workflow id powers the completion watch (see startCompletionPoll) and
+    // the Temporal UI deep link. Slide the pane out so the learner watches the
+    // run they just started.
+    if (payload.workflowId) {
+      state.workflowId = payload.workflowId;
+      if (state.temporalUiUrl) state.workflowPaneOpen = true;
+    }
     // A worker-only run has no workflowResult; leave the output pane untouched.
     if (payload.workflowResult !== undefined) {
       state.workflowOutput = payload.workflowResult || "(no output)";
@@ -719,6 +826,7 @@ async function stopSandbox() {
 function clearSandboxState() {
   state.sandboxId = "";
   state.temporalUiUrl = "";
+  state.workflowPaneOpen = false;
   state.workerActive = false;
   localStorage.removeItem(`${storagePrefix}:sandbox-id`);
   localStorage.removeItem(`${storagePrefix}:temporal-ui-url`);
@@ -727,6 +835,13 @@ function clearSandboxState() {
 watch(editorValue, (value) => {
   persistCurrentEdit();
   setEditorDoc(value);
+});
+
+// A changed src means a real (re)load (new sandbox, or root → workflow), so re-arm
+// the spinner until it paints. Toggling the pane open/closed keeps the same src, so
+// it doesn't reload.
+watch(paneSrc, () => {
+  state.paneFrameLoaded = false;
 });
 
 // Keep the freshest console output in view as logs/spinner stream in (and when
@@ -818,7 +933,11 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <main class="course-shell" :style="{ '--code-col': state.codeWidth || undefined }">
+    <main
+      class="course-shell"
+      :class="{ 'pane-open': state.workflowPaneOpen }"
+      :style="{ '--code-col': state.codeWidth || undefined, '--pane-width': state.paneWidth || undefined }"
+    >
       <section class="workspace-panel code-panel" aria-label="Code workspace">
         <div class="file-tabs" role="tablist" aria-label="Source files" data-tour="file-tabs">
           <template v-for="file in currentFiles" :key="file.path">
@@ -870,7 +989,7 @@ onBeforeUnmount(() => {
               <button class="button button-primary" type="button" data-tour="run" :disabled="!canRunSandbox" @click="runInSandbox">
                 Run
               </button>
-              <a v-if="state.sandboxId && state.temporalUiUrl" class="button button-link button-cta" :href="state.temporalUiUrl" target="_blank" rel="noopener">Temporal UI</a>
+              <button v-if="state.sandboxId && state.temporalUiUrl" class="button button-link button-cta" type="button" :aria-pressed="state.workflowPaneOpen" @click="toggleWorkflowPane">Temporal UI</button>
               <button class="button" type="button" @click="resetCurrentFile">Reset</button>
               <button class="button" type="button" :disabled="!canStopSandbox" @click="stopSandbox">Stop</button>
             </div>
@@ -930,6 +1049,50 @@ onBeforeUnmount(() => {
             </template>
           </div>
           <div v-else v-html="instructionHtml" />
+        </div>
+      </section>
+
+      <div
+        v-if="state.workflowPaneOpen"
+        class="pane-resizer"
+        data-cursor="col-resize"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize workflow pane"
+        @pointerdown="startWorkflowPaneResize"
+      />
+      <!-- One persistent iframe per sandbox: mounted as soon as the sandbox exists so
+           the SPA boots off-screen, kept alive across open/close (and client-navigated
+           rather than reloaded) so it never re-downloads or re-parses the bundle. -->
+      <section
+        v-if="proxyOrigin && state.sandboxId"
+        class="workspace-panel workflow-pane"
+        :class="{ 'workflow-pane--collapsed': !state.workflowPaneOpen }"
+        :aria-hidden="!state.workflowPaneOpen"
+        aria-label="Workflow in Temporal UI"
+      >
+        <header class="workflow-pane-head">
+          <div class="workflow-pane-title">
+            <span class="panel-kicker">Temporal UI</span>
+            <code v-if="state.workflowId" class="workflow-pane-id">{{ state.workflowId }}</code>
+          </div>
+          <div class="workflow-pane-actions">
+            <a v-if="workflowWatchUrl" class="button button-link" :href="workflowWatchUrl" target="_blank" rel="noopener" title="Open in a new tab">Open ↗</a>
+            <button class="button" type="button" title="Close" @click="closeWorkflowPane">✕</button>
+          </div>
+        </header>
+        <div class="workflow-pane-body">
+          <iframe
+            v-if="paneSrc"
+            :src="paneSrc"
+            class="workflow-pane-frame"
+            title="Temporal Web UI"
+            @load="onPaneFrameLoad"
+          />
+          <div v-if="paneSrc && state.workflowPaneOpen && !state.paneFrameLoaded" class="workflow-pane-loading" role="status" aria-live="polite">
+            <span class="workflow-pane-spinner" aria-hidden="true"></span>
+            <span>Loading the workflow…</span>
+          </div>
         </div>
       </section>
     </main>
