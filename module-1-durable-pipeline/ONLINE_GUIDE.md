@@ -23,8 +23,9 @@ job is to *orchestrate* them from the workflow, not to change them:
 | `runCreditCheck` | `(applicantName, ssn)` | `"Credit check passed … score 750"` |
 | `underwrite` | `(applicantName, annualIncome, loanAmount, downPayment)` | `"Underwriting approved … DTI …%"` |
 
-Each one sleeps ~2.5s (so the pipeline is visible in the UI) and returns a string.
-That deliberate delay is also what gives you a window to crash the worker in Step 4.
+Each one returns a string. By default they run instantly (`SIMULATED_PROCESSING_MS = 0`
+at the top of `activities.ts`), so the whole pipeline finishes in a blink. In **Step 4**
+you'll bump that constant up to give yourself a window to crash the worker mid-pipeline.
 
 ---
 
@@ -67,9 +68,10 @@ Hit **Run** in the dock. It provisions a sandbox, starts your worker, and submit
 loan `LOAN-PIPELINE-001`.
 
 ✓ **Checkpoint:** the console shows the worker starting and `LOAN-PIPELINE-001` being
-submitted. Click the **Temporal UI** button, open `LOAN-PIPELINE-001`, and over ~8 seconds
-the **History** tab fills with three `ActivityTaskCompleted` events — one per
-activity. The workflow finishes as **Completed**, and its result shows
+submitted. Click the **Temporal UI** button, open `LOAN-PIPELINE-001`, and the
+**History** tab shows three `ActivityTaskCompleted` events — one per
+activity. (With the default `SIMULATED_PROCESSING_MS = 0` this happens almost
+instantly.) The workflow finishes as **Completed**, and its result shows
 `status: 'UNDERWRITTEN'` with all three names in `completedActivities`.
 
 > Workflow **completes instantly with no activity events**? The `// TODO` block
@@ -82,8 +84,13 @@ activity. The workflow finishes as **Completed**, and its result shows
 
 This is the lesson. Break it on purpose and watch Temporal shrug it off.
 
+First, give yourself a window to crash the worker: open **`activities.ts`** and change
+the constant at the top from `SIMULATED_PROCESSING_MS = 0` to `2000`. Each activity now
+sleeps ~2s, so the pipeline takes ~6s — long enough to stop and restart the worker
+mid-run. Save (autosaves in the browser).
+
 1. Hit **Run** to start a fresh loan.
-2. **While the activities are still running** (~8s window), click the **■** (stop)
+2. **While the activities are still running** (~6s window), click the **■** (stop)
    button next to the **`worker.ts`** tab to kill the worker.
 3. Refresh `LOAN-PIPELINE-001` in the Temporal UI.
    ✓ **Observe:** the workflow is **not failed** — it's just *waiting*. The

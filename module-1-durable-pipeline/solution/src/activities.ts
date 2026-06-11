@@ -8,7 +8,7 @@ import { ApplicationFailure } from '@temporalio/activity';
 // throws ApplicationFailure.nonRetryable() on bad data.
 
 // A small delay so the pipeline is observable in the Temporal UI.
-const SIMULATED_PROCESSING_MS = 2500;
+const SIMULATED_PROCESSING_MS = 0; // change this to 2000 add delay and time to stop and start workers to see the workflow continue where it left off in the Temporal UI
 const simulateProcessing = () =>
   new Promise<void>((resolve) => setTimeout(resolve, SIMULATED_PROCESSING_MS));
 

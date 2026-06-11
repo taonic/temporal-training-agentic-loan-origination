@@ -42,9 +42,10 @@ activities are already written — you'll *orchestrate* them, not change them:
 | `runCreditCheck` | `(applicantName, ssn)` | `"Credit check passed … score 750"` |
 | `underwrite` | `(applicantName, annualIncome, loanAmount, downPayment)` | `"Underwriting approved … DTI …%"` |
 
-Each one sleeps ~2.5s (so the pipeline is visible in the UI) and returns a
-string. That deliberate delay is also what gives you a window to crash the worker
-in Step 4.
+Each one returns a string. By default they run instantly
+(`SIMULATED_PROCESSING_MS = 0` at the top of `activities.ts`), so the whole pipeline
+finishes in a blink. In **Step 4** you'll bump that constant up to give yourself a
+window to crash the worker mid-pipeline.
 
 ---
 
@@ -103,9 +104,10 @@ npx ts-node module-1-durable-pipeline/starter/src/client.ts
 
 ✓ **Checkpoint:** the client prints `Started LOAN-PIPELINE-001 (clean)` and a watch URL,
 then exits right away — it *starts* the workflow without waiting for it. Open that
-URL (or http://localhost:8233 → `LOAN-PIPELINE-001`) and watch: over ~8 seconds the
-**History** tab fills with three `ActivityTaskCompleted` events and the workflow
-reaches **Completed** with status `UNDERWRITTEN`.
+URL (or http://localhost:8233 → `LOAN-PIPELINE-001`) and watch: the
+**History** tab shows three `ActivityTaskCompleted` events and the workflow
+reaches **Completed** with status `UNDERWRITTEN`. (With the default
+`SIMULATED_PROCESSING_MS = 0` this happens almost instantly.)
 
 To read the final state from the CLI instead:
 
@@ -123,11 +125,16 @@ temporal workflow show --workflow-id LOAN-PIPELINE-001
 
 Now break it on purpose and watch Temporal shrug it off.
 
+First, give yourself a window to crash the worker: open `activities.ts` and change
+the constant at the top from `SIMULATED_PROCESSING_MS = 0` to `2000`. Each activity
+now sleeps ~2s, so the pipeline takes ~6s — long enough to kill and restart the
+worker mid-run. Save, then restart the worker in **Terminal 2** so it picks up the change.
+
 1. In **Terminal 3**, start a fresh run, then **immediately** switch to Terminal 2:
    ```bash
    npx ts-node module-1-durable-pipeline/starter/src/client.ts
    ```
-2. While the activities are still running (you have ~8s), **kill the worker** in
+2. While the activities are still running (you have ~6s), **kill the worker** in
    **Terminal 2** with **Ctrl-C**.
 3. Open `LOAN-PIPELINE-001` in the Temporal UI and refresh.
    ✓ **Observe:** the workflow is **not failed** — it's just *waiting*. The
